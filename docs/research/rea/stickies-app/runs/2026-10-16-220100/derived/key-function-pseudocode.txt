@@ -1,0 +1,380 @@
+
+
+===== SNAppDelegate::applicationDidFinishLaunching: @0x100000fb0 ev_c3a18f68de9e23c32bc9892ade1491a5fe01296a25184e22d529e5138162f227
+
+/* WARNING: Function: _objc_retain replaced with injection: _objc_retain_fixup */
+/* WARNING: Function: _objc_claimAutoreleasedReturnValue replaced with injection: _objc_retain_fixup
+    */
+/* WARNING: Function: _objc_release replaced with injection: _objc_release_fixup */
+/* WARNING: Function: _objc_retainBlock replaced with injection: _objc_retain_fixup */
+/* Function Stack Size: 0x18 bytes */
+
+void SNAppDelegate::applicationDidFinishLaunching_(ID param_1,SEL param_2,ID param_3)
+
+{
+  byte bVar1;
+  undefined *puVar2;
+  undefined *puVar3;
+  ID IVar4;
+  ID IVar5;
+  undefined8 uVar6;
+  ulong uVar7;
+  ID IVar8;
+  uint uVar9;
+  double extraout_d0;
+  undefined *local_1f0;
+  undefined8 local_1e8;
+  code *local_1e0;
+  undefined *puStack_1d8;
+  ID local_1d0;
+  undefined **local_1c8;
+  byte local_1c0;
+  undefined *local_1b8;
+  undefined8 local_1b0;
+  code *local_1a8;
+  undefined *puStack_1a0;
+  ID local_198;
+  undefined **local_190;
+  byte local_188;
+  undefined *local_180;
+  undefined8 local_178;
+  code *local_170;
+  undefined *puStack_168;
+  undefined1 auStack_160 [8];
+  undefined1 auStack_158 [8];
+  undefined *local_150;
+  undefined8 local_148;
+  code *local_140;
+  undefined *puStack_138;
+  ID local_130;
+  char local_121;
+  cfstringStruct *local_120;
+  cfstringStruct *pcStack_118;
+  cfstringStruct *local_110;
+  cfstringStruct *pcStack_108;
+  cfstringStruct *local_100;
+  cfstringStruct *local_f8;
+  cfstringStruct *local_f0;
+  cfstringStruct *local_e8;
+  cfstringStruct *local_e0;
+  cfstringStruct *local_d8;
+  undefined *local_d0;
+  undefined8 local_c8;
+  undefined *local_c0;
+  undefined *puStack_b8;
+  ID local_b0;
+  ID local_a8;
+  ID local_a0;
+  ID local_98;
+  ID local_90;
+  ID local_88;
+  long local_80;
+  
+  local_80 = *(long *)PTR____stack_chk_guard_1000221a8;
+  IVar4 = NSUserDefaults::standardUserDefaults((ID)PTR__OBJC_CLASS___NSUserDefaults_100022078);
+  NSUserDefaults::setBool_forKey_(IVar4,0,&cf_NSFullScreenMenuItemEverywhere);
+  _objc_alloc_init(&objc::class_t::StickiesService);
+  objc_stub::setServicesProvider_(*(ID *)PTR__NSApp_1000220a0);
+  IVar5 = NSUserDefaults::objectForKey_(IVar4,&cf_CollapseWhenArranging);
+  uVar6 = _objc_opt_class(PTR__OBJC_CLASS___NSNumber_100022000);
+  uVar7 = _objc_opt_isKindOfClass(IVar5,uVar6);
+  if ((uVar7 & 1) == 0) {
+    uVar6 = 0;
+  }
+  else {
+    IVar5 = NSUserDefaults::boolValue(IVar5);
+    uVar6 = 0;
+    if ((int)IVar5 == 0) {
+      uVar6 = 2;
+    }
+    NSUserDefaults::removeObjectForKey_(IVar4,&cf_CollapseWhenArranging);
+    NSUserDefaults::setInteger_forKey_(IVar4,uVar6);
+  }
+  puVar3 = PTR____kCFBooleanFalse_100022088;
+  local_d0 = PTR____kCFBooleanFalse_100022088;
+  local_120 = &cf_LegacyStickiesMigrated;
+  pcStack_118 = &cf_DefaultWindowSize;
+  local_c8 = _NSStringFromSize(0x4072c00000000000,0x4069000000000000);
+  puVar2 = PTR__OBJC_CLASS___NSKeyedArchiver_100021fe8;
+  local_110 = &cf_DefaultWindowFloating;
+  pcStack_108 = &cf_DefaultWindowTranslucent;
+  local_c0 = puVar3;
+  puStack_b8 = puVar3;
+  local_100 = &cf_DefaultFont;
+  IVar5 = NSFont::userFontOfSize_((ID)PTR__OBJC_CLASS___NSFont_100022120,0x4028000000000000);
+  local_b0 = NSKeyedArchiver::archivedDataWithRootObject_requiringSecureCoding_error_
+                       ((ID)puVar2,IVar5,1,0);
+  local_f8 = &cf_DefaultStickyColor;
+  IVar5 = SNUtility::utility((ID)PTR_SNUtility_100021f88);
+  IVar8 = NSColor::colorNamed_((ID)PTR__OBJC_CLASS___NSColor_100022108,&cf_StickiesYellowColor);
+  local_a8 = SNUtility::dictionaryRepresentationOfColor_(
+
+===== SNWindow::setFloating: @0x10000ffdc ev_d267c967afe43b7685c961e97831057ca85f789a7c2f49927957dc751e9efdb3
+
+/* Function Stack Size: 0x14 bytes */
+
+void SNWindow::setFloating_(ID param_1,SEL param_2,bool param_3)
+
+{
+  undefined8 uVar1;
+  
+  uVar1 = 3;
+  if (param_3 == 0) {
+    uVar1 = 0;
+  }
+  objc_stub::setLevel_(param_1,uVar1);
+  return;
+}
+
+
+
+===== SNWindow::toggleFloatingMenuAction: @0x10000fefc ev_e73d63209df5b6d12d459dfdf3991307b0d385c5f397ced36cc33cb0c42fec9e
+
+/* WARNING: Function: _objc_claimAutoreleasedReturnValue replaced with injection: _objc_retain_fixup
+    */
+/* WARNING: Function: _objc_release replaced with injection: _objc_release_fixup */
+/* Function Stack Size: 0x18 bytes */
+
+void SNWindow::toggleFloatingMenuAction_(ID param_1,SEL param_2,ID param_3)
+
+{
+  code *pcVar1;
+  bool bVar2;
+  ID self;
+  ulong unaff_x30;
+  
+  bVar2 = isFloating(param_1);
+  setFloating_(param_1,bVar2 ^ 1);
+  self = objc_stub::delegate(param_1);
+  objc_stub::updateChangeCount_(self,0);
+  if (((unaff_x30 ^ unaff_x30 << 1) >> 0x3e & 1) != 0) {
+                    /* WARNING: Does not return */
+    pcVar1 = (code *)SoftwareBreakpoint(0xc471,0x10000ff54);
+    (*pcVar1)();
+  }
+  return;
+}
+
+
+
+===== SNWindow::setTranslucent: @0x100010010 ev_915d01741d5756f206388cbc4fc9fdfd6743e6a7ef8f862356c05121adad826b
+
+/* Function Stack Size: 0x14 bytes */
+
+void SNWindow::setTranslucent_(ID param_1,SEL param_2,bool param_3)
+
+{
+  undefined8 uVar1;
+  
+  uVar1 = 0x3fe8000000000000;
+  if (param_3 == 0) {
+    uVar1 = 0x3ff0000000000000;
+  }
+  objc_stub::setAlphaValue_(param_1,uVar1);
+  return;
+}
+
+
+
+===== SNWindow::collectionBehavior @0x10000fca4 ev_e4a6676fc22754b51324184c4818a36c09d868109111007bb4c48c6ef9e87e97
+
+/* Function Stack Size: 0x10 bytes */
+
+unsigned_long_long SNWindow::collectionBehavior(ID param_1,SEL param_2)
+
+{
+  return 4;
+}
+
+
+
+===== SNUtility::writeSavedStickiesStateToPersistentStorage @0x10000662c ev_80e1806fd7af31a3328ccf54bc53c8afb8c0611ce904a4e5b4669de86c024faf
+
+/* WARNING: Function: _objc_claimAutoreleasedReturnValue replaced with injection: _objc_retain_fixup
+    */
+/* WARNING: Function: _objc_release replaced with injection: _objc_release_fixup */
+/* Function Stack Size: 0x10 bytes */
+
+bool SNUtility::writeSavedStickiesStateToPersistentStorage(ID param_1,SEL param_2)
+
+{
+  ID IVar1;
+  ID IVar2;
+  
+  IVar1 = stickiesState(param_1);
+  IVar2 = savedStickiesStatePath(param_1);
+  IVar1 = objc_stub::writeToFile_atomically_(IVar1,IVar2,1);
+  return (bool)IVar1;
+}
+
+
+
+===== SNDocument::writeToURL:ofType:error: @0x10000b02c ev_d38affd744d0d5aa77354c2c4ecd3626a95ed378a5451ce04baafd2fa4ac7247
+
+/* WARNING: Function: _objc_retain replaced with injection: _objc_retain_fixup */
+/* WARNING: Function: _objc_claimAutoreleasedReturnValue replaced with injection: _objc_retain_fixup
+    */
+/* WARNING: Function: _objc_release replaced with injection: _objc_release_fixup */
+/* WARNING: Function: _objc_autorelease replaced with injection: _objc_retain_fixup */
+/* Function Stack Size: 0x28 bytes */
+
+bool SNDocument::writeToURL_ofType_error_(ID param_1,SEL param_2,ID param_3,ID param_4,ID *param_5)
+
+{
+  ID IVar1;
+  ID IVar2;
+  ID IVar3;
+  ID IVar4;
+  ID local_48;
+  
+  IVar1 = objc_stub::isEqualToString_(param_4,&cf_rtfd);
+  if ((bool)IVar1 == 0) {
+    if (param_5 != (ID *)0x0) {
+      IVar2 = NSError::errorWithDomain_code_userInfo_
+                        ((ID)PTR__OBJC_CLASS___NSError_100021fd8,
+                         *(undefined8 *)PTR__NSCocoaErrorDomain_100021f90,0x200,0);
+      *param_5 = IVar2;
+    }
+  }
+  else {
+    IVar2 = stickyWindow(param_1);
+    IVar3 = objc_stub::path(param_3);
+    objc_stub::saveToFile_(IVar2,IVar3);
+    local_48 = 0;
+    saveWindowState_(param_1,&local_48);
+    IVar2 = local_48;
+    IVar3 = SNUtility::utility((ID)PTR_SNUtility_100021f88);
+    IVar4 = stickyUUID(param_1);
+    SNUtility::setSavedState_forUUID_(IVar3,IVar2,IVar4);
+    IVar2 = SNUtility::utility((ID)PTR_SNUtility_100021f88);
+    SNUtility::writeSavedStickiesStateToPersistentStorage(IVar2);
+  }
+  return (bool)IVar1;
+}
+
+
+
+===== SNWindow::collapse: @0x10000eb5c ev_077328b47023c39b4905ba130e363acc7916d997af2d4877ecebea772b324fb3
+
+/* WARNING: Function: _objc_claimAutoreleasedReturnValue replaced with injection: _objc_retain_fixup
+    */
+/* WARNING: Function: _objc_release replaced with injection: _objc_release_fixup */
+/* Function Stack Size: 0x18 bytes */
+
+void SNWindow::collapse_(ID param_1,SEL param_2,ID param_3)
+
+{
+  code *pcVar1;
+  bool bVar2;
+  ID IVar3;
+  ID IVar4;
+  ulong uVar5;
+  ulong unaff_x30;
+  undefined8 extraout_d0;
+  double dVar6;
+  double dVar7;
+  double in_d1;
+  double in_d2;
+  double in_d3;
+  double dVar8;
+  CGSize CVar9;
+  CGSize CVar10;
+  
+  objc_stub::frame(param_1);
+  dVar6 = in_d2;
+  dVar8 = in_d3;
+  bVar2 = isCollapsed(param_1);
+  if (bVar2 == 0) {
+    CVar9.field1_0x8 = in_d3;
+    CVar9.field0_0x0 = in_d2;
+    setExpandedFrameSize_(param_1,CVar9);
+    dVar7 = expandFrameY(param_1);
+    if (0.0 <= dVar7) {
+      CVar9 = expandedFrameSize(param_1);
+      IVar3 = spineView(param_1);
+      objc_stub::frame(IVar3);
+      in_d1 = in_d1 + (CVar9.field1_0x8 - dVar8);
+    }
+    else {
+      dVar7 = expandFrameY(param_1);
+      IVar3 = spineView(param_1);
+      objc_stub::frame(IVar3);
+      in_d1 = (in_d3 + dVar7) - dVar8;
+    }
+    IVar3 = spineView(param_1);
+    objc_stub::frame(IVar3);
+    CVar10.field1_0x8 = dVar8;
+    CVar10.field0_0x0 = dVar6;
+    IVar3 = zoomButton(param_1);
+    objc_stub::setHidden_(IVar3,1);
+    IVar3 = NSBundle::mainBundle((ID)PTR__OBJC_CLASS___NSBundle_100021fc0);
+    IVar3 = NSBundle::localizedStringForKey_value_table_(IVar3,&cf_DEMINIMIZE,&cf___,0);
+    IVar4 = collapseButton(param_1);
+    objc_stub::setToolTip_(IVar4,IVar3);
+    updateTitle(param_1);
+    IVar3 = titleTextField(param_1);
+    objc_stub::setHidden_(IVar3,0);
+    IVar3 = objc_stub::styleMask(param_1);
+    uVar5 = IVar3 & 0xfffffffffffffff7;
+  }
+  else {
+    CVar9 = expandedFrameSize(param_1);
+    IVar3 = spineView(param_1);
+    objc_stub::frame(IVar3);
+    in_d1 = in_d1 - (CVar9.field1_0x8 - dVar8);
+    if ((in_d1 < 0.0) && (dVar6 = expandFrameY(param_1), dVar6 != 0.0)) {
+      setExpandFrameY_(param_1,in_d1);
+      in_d1 = 0.0;
+    }
+    CVar10 = expandedFrameSize(param_1);
+    IVar3 = zoomButton(param_1);
+    objc_stub::setHidden_(IVar3,0);
+    IVar3 = NSBundle::mainBundle((ID)PTR__OBJC_CLASS___NSBundle_100021fc0);
+    IVar3 = NSBundle::localizedStringForKey_value_table_(IVar3,&cf_MINIMIZE,&cf___,0);
+    IVar4 = collapseButton(param_1);
+    objc_stub::setToolTip_(IVar4,IVar3);
+    IVar3 = titleTextField(param_1);
+    objc_stub::setHidden_(IVar3,1);
+    IVar3 = objc_stub::styleMask(param_1);
+    uVar5 = IVar3 | 8;
+  }
+  objc_stub::setStyleMask_(param_1,uVar5);
+  updateWindowFrame(param_1);
+  IVar3 = objc_stub::isVisible(param_1);
+  objc_stub::setFrame_display_animate_
+            (param_1,extraout_d0,in_d1,CVar10.field0_0x0,CVar10.field1_0x8,1,IVar3);
+  if (((unaff_x30 ^ unaff_x30 << 1) >> 0x3e & 1) != 0) {
+                    /* WARNING: Does not return */
+    pcVar1 = (code *)SoftwareBreakpoint(0xc471,0x10000ee68);
+    (*pcVar1)();
+  }
+  updateWindowFrame(param_1);
+  return;
+}
+
+
+
+===== StickiesService::makeStickyFromTextService:userData:error: @0x10000a3cc ev_d23857b90dfd3d2a4de0cb6be2adae70c5a5b1aee57385370b59863a9e9f03ef
+
+/* Function Stack Size: 0x28 bytes */
+
+void StickiesService::makeStickyFromTextService_userData_error_
+               (ID param_1,SEL param_2,ID param_3,ID param_4,ID *param_5)
+
+{
+  SNDocument::makeStickiesFromPasteboard_(0x100027238,param_3);
+  return;
+}
+
+
+
+===== SNWindow::isMovableByWindowBackground @0x10000ffb4 ev_ead06d5033959d243806120e5e1c0c69b3f1711c429d99c5cb544e88bd24e77f
+
+/* Function Stack Size: 0x10 bytes */
+
+bool SNWindow::isMovableByWindowBackground(ID param_1,SEL param_2)
+
+{
+  return 1;
+}
+
