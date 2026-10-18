@@ -73,19 +73,38 @@ pub struct Note {
     pub pinned: bool,
     pub translucent: bool,
     pub collapsed: bool,
+    /// 正文字号，单位 px。旧文档没有这个字段，读进来落回 `DEFAULT_FONT_SIZE`。
+    #[serde(default = "default_font_size")]
+    pub font_size: f64,
+    /// 是否显示 Markdown 工具栏。默认不显示：便签窗口很窄，工具栏按需开。
     #[serde(default)]
+    pub toolbar: bool,
+    /// 正文字体，取值见前端 `FONTS`。旧文档没有这个字段，落回默认字体。
+    #[serde(default = "default_font")]
+    pub font: String,
     pub spine_size: SpineSize,
     pub frame: Rect,
     /// 折叠前保存的展开尺寸；未折叠时为 None。
     pub expanded_size: Option<Size>,
+    /// 是否处于放大态。旧文档没有这个字段，按没放大读进来。
+    #[serde(default)]
+    pub maximized: bool,
+    /// 放大之前的 frame，双击才回得去；不在放大态时为 None。
+    /// `Option` 字段在 serde 里本来就认缺省，所以旧文档少这个键也能读。
+    pub restore_frame: Option<Rect>,
     pub z_order: i64,
     pub visible: bool,
 }
 
-/// 新建便签的默认尺寸。字号 12 由前端常量给出，不是文档字段。
+/// 新建便签的默认尺寸。
 /// 300×200 装不下几行字，改成 420×320：正文能一次看到十几行，又不会占掉半屏。
 pub const DEFAULT_WIDTH: f64 = 420.0;
 pub const DEFAULT_HEIGHT: f64 = 320.0;
+/// 新建便签的正文默认字号。
+pub const DEFAULT_FONT_SIZE: f64 = 14.0;
+/// 手动缩放字号的上下限。再小读不清字，再大一行放不下几个字。
+pub const MIN_FONT_SIZE: f64 = 10.0;
+pub const MAX_FONT_SIZE: f64 = 28.0;
 
 /// 手动缩放的下限。到下限还能看见脊条、分页条和几行正文；再小就点不到窗口按钮、也读不到字了。
 pub const MIN_WIDTH: f64 = 200.0;
@@ -99,6 +118,18 @@ pub fn empty_doc() -> serde_json::Value {
     })
 }
 
+/// 默认字体。和前端 `document.ts` 的 DEFAULT_FONT 是同一个值。
+pub const DEFAULT_FONT: &str = "system";
+
+/// `font` 的缺省值。serde 的 `default` 只认无参函数，所以写在这里。
+fn default_font() -> String {
+    DEFAULT_FONT.to_string()
+}
+
+/// `font_size` 的缺省值。serde 的 `default` 只认无参函数，所以写在这里。
+fn default_font_size() -> f64 {
+    DEFAULT_FONT_SIZE
+}
 impl Note {
     /// 新建便签：象牙底色、纯色底纹、可见。
     pub fn new(id: String, frame: Rect) -> Self {
@@ -114,9 +145,14 @@ impl Note {
             pinned: false,
             translucent: false,
             collapsed: false,
+            font_size: DEFAULT_FONT_SIZE,
+            toolbar: false,
+            font: DEFAULT_FONT.to_string(),
             spine_size: SpineSize::Min,
             frame,
             expanded_size: None,
+            maximized: false,
+            restore_frame: None,
             z_order: 0,
             visible: true,
         }
@@ -137,6 +173,14 @@ impl Note {
             if !self.content.contains_key(tab) {
                 return Err(NoteError::Invalid(format!("分页 {tab} 没有正文")));
             }
+        }
+        // 字号越界的文档照样能读，但不能开窗口：0 号字在界面上是一张白纸，
+        // 用户会以为便签内容丢了，而正文其实还在文件里。
+        if !(MIN_FONT_SIZE..=MAX_FONT_SIZE).contains(&self.font_size) {
+            return Err(NoteError::Invalid(format!(
+                "字号 {} 不在 {}–{} 之间",
+                self.font_size, MIN_FONT_SIZE, MAX_FONT_SIZE
+            )));
         }
         if self.collapsed && self.expanded_size.is_none() {
             return Err(NoteError::Invalid("已折叠但没有展开尺寸".into()));
@@ -281,7 +325,54 @@ mod tests {
         assert_eq!(note.content[&note.active_tab], empty_doc());
         assert_eq!(note.paper, Paper::AlabasterGrey);
         assert_eq!(note.pattern, Pattern::Plain);
+        assert_eq!(note.font_size, DEFAULT_FONT_SIZE);
+        assert!(!note.toolbar);
+        assert_eq!(note.font, DEFAULT_FONT);
         assert!(note.visible);
+    }
+
+    #[test]
+    fn document_without_font_fields_falls_back_to_defaults() {
+        // 字号和工具栏是后加的字段，磁盘上早于它们的文档必须照常打开。
+        let dir = test_dir();
+        let note = Note::new(
+            "n1".into(),
+            Rect::new(0.0, 0.0, DEFAULT_WIDTH, DEFAULT_HEIGHT),
+        );
+        let mut value = serde_json::to_value(&note).unwrap();
+        let object = value.as_object_mut().unwrap();
+        object.remove("fontSize");
+        object.remove("toolbar");
+        object.remove("maximized");
+        object.remove("restoreFrame");
+        object.remove("font");
+        write_raw(&dir, "n1", &value);
+
+        let loaded = load(&dir, "n1").unwrap();
+        assert_eq!(loaded.font_size, DEFAULT_FONT_SIZE);
+        assert!(!loaded.toolbar);
+        assert!(!loaded.maximized);
+        assert_eq!(loaded.restore_frame, None);
+        assert_eq!(loaded.font, DEFAULT_FONT);
+    }
+
+    #[test]
+    fn font_size_outside_the_zoom_range_is_rejected() {
+        let dir = test_dir();
+        for size in [0.0, MIN_FONT_SIZE - 1.0, MAX_FONT_SIZE + 1.0] {
+            let note = Note::new(
+                "n1".into(),
+                Rect::new(0.0, 0.0, DEFAULT_WIDTH, DEFAULT_HEIGHT),
+            );
+            let mut value = serde_json::to_value(&note).unwrap();
+            value["fontSize"] = serde_json::json!(size);
+            write_raw(&dir, "n1", &value);
+
+            assert!(
+                matches!(load(&dir, "n1"), Err(NoteError::Invalid(_))),
+                "{size} 应被拒绝"
+            );
+        }
     }
 
     #[test]

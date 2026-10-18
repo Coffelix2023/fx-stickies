@@ -150,14 +150,14 @@ fn menu_url(id: &str) -> WebviewUrl {
 /// 菜单窗口 label 前缀。它同时是「这个窗口是不是菜单」的判据。
 pub(crate) const MENU_LABEL_PREFIX: &str = "menu-";
 
-/// 菜单窗口尺寸：菜单卡片 208×359，四周留 16px 给 CSS 阴影。
+/// 菜单窗口的初始尺寸：卡片四周留 16px 给 CSS 阴影，并给菜单内容留出首次渲染余量。
 /// shortcut: 这 16px 是 note-menu.css 里 `.menu-window #root` 的 padding，两边要一致；
 /// 卡片靠这个内缩量和按钮错开，改一处要改两处。
-/// shortcut: 高度必须容得下卡片，改结构后量一次卡片的 getBoundingClientRect().height，
-/// 再加 2×阴影留白和余量：底色两行 58 + 底纹 36 + 对齐九宫格三行 28×3 + 三个标签 24×3
-/// + 隐藏删除 26×2 + 分隔线 8×3 + 卡片内边距 8 = 359。少留窗口会被裁掉最后一行。
+/// 初始高度必须覆盖完整菜单，否则窗口还没完成前端实测收窄时，字体子菜单会被底部裁掉。
+/// 卡片渲染后 NoteMenuWindow 会按实测高度收窄；二级菜单展开时再按实际矩形变宽。
+/// 宽度是二级菜单收起来时的宽度，展开宽度由 NoteMenuWindow 根据卡片和子菜单矩形计算。
 const MENU_WINDOW_WIDTH: f64 = 240.0;
-const MENU_WINDOW_HEIGHT: f64 = 420.0;
+const MENU_WINDOW_HEIGHT: f64 = 480.0;
 
 /// 触发按钮的边长，前端 `NoteMenu` 的按钮就是 18×18。
 /// shortcut: 必须与 NoteMenu.tsx 的 size-[18px] 一致，改一处要改两处。
@@ -493,15 +493,73 @@ fn align_note<R: Runtime>(
     placement: Placement,
 ) -> Result<Note, String> {
     let dir = notes_dir(&app)?;
-    let area = app.get_webview_window(&id).and_then(|window| {
-        window
-            .current_monitor()
-            .ok()
-            .flatten()
-            .map(|monitor| monitor_rect(&monitor))
-            .or_else(|| monitor_rects(&app).first().copied())
-    });
-    align_note_to(&app, &dir, &id, area, placement)
+    align_note_to(&app, &dir, &id, current_area(&app, &id), placement)
+}
+
+/// 窗口所在那块屏的可见区域；窗口不在或拿不到显示器时用第一块屏兜底。
+fn current_area<R: Runtime>(app: &AppHandle<R>, id: &str) -> Option<Rect> {
+    app.get_webview_window(id)
+        .and_then(|window| {
+            window
+                .current_monitor()
+                .ok()
+                .flatten()
+                .map(|monitor| monitor_rect(&monitor))
+                .or_else(|| monitor_rects(app).first().copied())
+        })
+}
+
+/// 双击脊条放大/恢复的执行部分。`area` 由调用方给，测试才能喂假显示器数据。
+///
+/// 放大就是铺满所在屏幕的可见区域（避开菜单栏和 Dock），恢复时回到放大前的位置与尺寸。
+/// `monitors` 用来夹住旧的 `restore_frame`：拔掉一块屏之后双击恢复，便签不会弹到看不见的地方。
+fn toggle_maximize_to<R: Runtime>(
+    app: &AppHandle<R>,
+    dir: &Path,
+    id: &str,
+    area: Option<Rect>,
+    monitors: &[Rect],
+) -> Result<Note, String> {
+    let mut note = note::load(dir, id).map_err(|err| err.to_string())?;
+    let (Some(area), Some(window)) = (area, app.get_webview_window(id)) else {
+        return Ok(note);
+    };
+    let target = if note.maximized {
+        // 取走这份 frame：恢复之后就不再需要它了，下次放大会重新存。
+        // 老文档可能没有它（None），那就留在放大态的位置，不乱跳。
+        note.restore_frame
+            .take()
+            .map(|restore| frame::fit(restore, monitors))
+            .unwrap_or(area)
+    } else {
+        // 放大前先记下当前 frame，否则双击回去没有位置可回。
+        note.restore_frame = Some(live_frame(&window)?);
+        area
+    };
+    note.maximized = !note.maximized;
+    note.frame = target;
+    window
+        .set_size(LogicalSize::new(target.width, target.height))
+        .map_err(|err| err.to_string())?;
+    window
+        .set_position(LogicalPosition::new(target.x, target.y))
+        .map_err(|err| err.to_string())?;
+    note::save(dir, &note).map_err(|err| err.to_string())?;
+    Ok(note)
+}
+
+/// 双击脊条在铺满屏幕和原尺寸之间切换。屏幕坐标只有窗口层知道，所以走命令，
+/// 它顺手把放大前的位置写回文档，重启后双击还能回去。
+#[tauri::command]
+fn toggle_maximize<R: Runtime>(app: AppHandle<R>, id: String) -> Result<Note, String> {
+    let dir = notes_dir(&app)?;
+    toggle_maximize_to(
+        &app,
+        &dir,
+        &id,
+        current_area(&app, &id),
+        &monitor_rects(&app),
+    )
 }
 /// 收起菜单窗口。窗口不在时按成功处理，重复收起不出错。
 #[tauri::command]
@@ -632,7 +690,8 @@ pub fn run() {
             delete_note,
             align_note,
             open_menu_window,
-            close_menu_window
+            close_menu_window,
+            toggle_maximize
         ])
         .on_menu_event(|app, event| match notes_dir(app) {
             Ok(dir) => handle_menu_event(app, &dir, event.id().as_ref()),
@@ -807,6 +866,64 @@ mod tests {
 
         assert_eq!(aligned.frame, Rect::new(12.0, 37.0, 0.0, 0.0));
         assert_eq!(note::load(&dir, "n1").unwrap().frame, aligned.frame);
+    }
+
+    #[test]
+    fn maximizing_fills_the_screen_and_restoring_returns_to_the_old_frame() {
+        let app = mock_app();
+        let dir = test_dir();
+        let mut note = test_note("n1");
+        note.frame = Rect::new(500.0, 400.0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        note::save(&dir, &note).unwrap();
+        show_at(app.handle(), &note, note.frame).unwrap();
+        let area = Some(Rect::new(0.0, 25.0, 1920.0, 1055.0));
+        let monitors = [Rect::new(0.0, 25.0, 1920.0, 1055.0)];
+
+        // shortcut: MockRuntime 的窗口位置和尺寸恒为 0，所以 restore_frame 记下来的是 0×0；
+        // 这里钉住的是「铺满工作区」「记住原尺寸再回来」这条状态链。
+        let maximized = toggle_maximize_to(app.handle(), &dir, "n1", area, &monitors).unwrap();
+        assert_eq!(maximized.frame, area.unwrap());
+        assert!(maximized.maximized);
+
+        let restored = toggle_maximize_to(app.handle(), &dir, "n1", area, &monitors).unwrap();
+        assert!(!restored.maximized);
+        // 记下来的原 frame 要过一遍可见性校正：MockRuntime 的窗口恒为 0×0，
+        // 那个点不算「可见」，因此结果比原值低一档 y，真机上才是原位。
+        assert_eq!(
+            restored.frame,
+            frame::fit(maximized.restore_frame.unwrap(), &monitors)
+        );
+        // 恢复完就不再留着旧 frame，下一次放大重新记
+        assert_eq!(restored.restore_frame, None);
+    }
+
+    #[test]
+    fn restoring_clamps_a_frame_left_on_a_disconnected_screen() {
+        let app = mock_app();
+        let dir = test_dir();
+        let mut note = test_note("n1");
+        note.frame = Rect::new(500.0, 400.0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        // 拔屏之前放大过，恢复目标在另一块屏上
+        note.maximized = true;
+        note.restore_frame = Some(Rect::new(3000.0, 200.0, DEFAULT_WIDTH, DEFAULT_HEIGHT));
+        note::save(&dir, &note).unwrap();
+        show_at(app.handle(), &note, note.frame).unwrap();
+        let area = Some(Rect::new(0.0, 25.0, 1920.0, 1055.0));
+
+        let restored = toggle_maximize_to(
+            app.handle(),
+            &dir,
+            "n1",
+            area,
+            &[Rect::new(0.0, 25.0, 1920.0, 1055.0)],
+        )
+        .unwrap();
+
+        // 恢复目标被夹到当前屏幕内：x 收到 3000 → 1500，y 保持 200
+        assert_eq!(
+            restored.frame,
+            Rect::new(1500.0, 200.0, DEFAULT_WIDTH, DEFAULT_HEIGHT)
+        );
     }
 
     #[test]

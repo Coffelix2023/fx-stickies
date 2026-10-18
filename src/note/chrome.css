@@ -2,6 +2,7 @@
    派生变量必须和 --note-paper 声明在同一个元素上：自定义属性的 var() 在声明处替换，
    写在 :root 上时那里还没有 --note-paper，--note-muted / --note-hover 会整条失效。 */
 :root {
+  --note-font: sans-serif;
   --note-ink: #1c1915;
   --note-line: rgb(28 25 21 / 16%);
   /* 方格底纹专用：整页铺满，按 --note-line 的一半浓度。 */
@@ -47,11 +48,73 @@
   color: var(--note-ink);
 }
 
-
-.note-action[data-pinned="true"] {
-  /* 激活色跟随便签底色：--note-spine 是同一色系的深色档（App.css 里纸色取 100 档、脊条取 300 档）。 */
+/* 两个开关按钮的激活态，形状和底色一起变：
+   线框图标 = 关，填实图标 = 开。只换底色的话在浅色纸上几乎看不出来。 */
+.note-action[data-pinned="true"],
+.note-action[data-on="true"] {
   background: var(--note-spine);
   color: var(--note-paper);
+}
+
+/* 激活色跟随便签底色：--note-spine 是同一色系的深色档（App.css 里纸色取 100 档、脊条取 300 档）。 */
+.note-action[data-pinned="true"] svg,
+.note-action[data-on="true"] svg {
+  fill: currentColor;
+}
+
+/* 工具栏 - 与脊条同高 20px，贴在脊条下面。便签最窄能缩到 200px，
+   所以这一行横向滚动，不换行也不撑高窗口。 */
+.note-toolbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 20px;
+  gap: 2px;
+  padding: 0 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: color-mix(in srgb, var(--note-paper) 32%, var(--note-spine));
+  border-bottom: 1px solid var(--note-line);
+}
+
+.note-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 便签窄了工具栏装不下，靠横向滚动。右侧渐隐就是「还有更多项」的提示：
+   滚到底自动消失，mask 不随内容滚动，所以只在真的有溢出时挂上。 */
+.note-toolbar[data-more="true"] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+}
+
+.note-toolbar-group {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1px;
+}
+
+.note-toolbar-item {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+/* 生效中的标记跟着选区亮，选过的格式不用回头确认。 */
+.note-toolbar-item[data-active="true"] {
+  background: var(--note-spine);
+  color: var(--note-paper);
+}
+
+.note-toolbar-sep {
+  flex: none;
+  width: 1px;
+  height: 10px;
+  margin: 0 3px;
+  background: var(--note-line);
 }
 
 
@@ -61,7 +124,12 @@
   box-shadow: none;
 }
 
+/* 正文排版：字号挂在便签根上（.note 的 inline style），这里只管行距。
+   标题用 em，跟着字号一起缩放，改字号不用另改一遍标题规则。 */
 .note-body {
+  font-family: var(--note-font, sans-serif);
+  font-size: inherit;
+  line-height: 1.5;
   scrollbar-width: thin;
   scrollbar-color: var(--note-spine) transparent;
 }
@@ -69,6 +137,19 @@
 .note-body .tiptap {
   min-height: 100%;
   outline: none;
+  /* 制表符在 white-space: normal 下会被折叠成普通空格，Tab 缩进等于没缩进。 */
+  white-space: pre-wrap;
+}
+
+/* 右下角常驻的字符数 - 固定一行，正文因此矮 15px。便签最小 120px，仍装得下正文。 */
+.note-status {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  padding: 0 10px 3px;
+  color: var(--note-muted);
+  font-size: 10px;
+  line-height: 12px;
 }
 
 @media (prefers-reduced-motion: reduce) {

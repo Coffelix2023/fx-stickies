@@ -1,4 +1,4 @@
-import { NoteBody, useNoteEditor } from "./editor";
+import { NoteBody, NoteStatus, NoteToolbar, useNoteEditor } from "./editor";
 import { type Note, type NoteContent, activeContent } from "./document";
 
 type Props = {
@@ -21,7 +21,10 @@ export function NoteEditor({ note, onContentChange }: Props) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* 工具栏贴在脊条下面，正文自己缩到剩余高度。 */}
+      {note.toolbar && <NoteToolbar editor={editor} />}
       <NoteBody editor={editor} />
+      <NoteStatus editor={editor} />
     </div>
   );
 }

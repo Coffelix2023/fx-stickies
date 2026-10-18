@@ -63,6 +63,45 @@ export const PLACEMENT_LABELS: Record<Placement, string> = {
   bottomCenter: "靠底边",
   bottomRight: "右下角",
 };
+/**
+ * 可选正文字体。三种类型各占几款：两款无衬线、一款衬线、一款圆体、一款等宽。
+ *
+ * `font-maple-mono-cn` 由用户自己安装（没有 npm 包），所以只写字体名并兜底到系统等宽：
+ * 装了就是它，没装也不会掉到别的字体上。
+ */
+export const FONTS = [
+  { id: "system", label: "系统", stack: '-apple-system, "PingFang SC", "Helvetica Neue", sans-serif' },
+  { id: "geist", label: "Geist", stack: '"Geist Variable", -apple-system, sans-serif' },
+  { id: "songti", label: "宋体", stack: '"Songti SC", "STSong", Georgia, serif' },
+  { id: "yuanti", label: "圆体", stack: '"Yuanti SC", "YouYuan", "Songti SC", sans-serif' },
+  {
+    id: "maple",
+    label: "Maple",
+    stack: '"Maple Mono NF CN", "Maple Mono CN", ui-monospace, SFMono-Regular, Menlo, monospace',
+  },
+] as const;
+
+export type Font = (typeof FONTS)[number]["id"];
+
+/** 默认字体，取值与 Rust 端 `note::DEFAULT_FONT` 一致。 */
+export const DEFAULT_FONT: Font = "system";
+
+/** 正文字号的默认值与缩放上下限，与 Rust 端 `note::DEFAULT_FONT_SIZE` 等常量一致。 */
+export const DEFAULT_FONT_SIZE = 14;
+export const MIN_FONT_SIZE = 10;
+export const MAX_FONT_SIZE = 28;
+
+/**
+ * 缩放后的字号。`step` 为 0 时回默认字号，正负各是缩放一级。
+ *
+ * 菜单和 ⌘ +/- 走同一条规则，所以两边的结果永远一致；菜单窗口里的乐观更新
+ * 也用它算，不用重读文档。
+ */
+export function scaleFontSize(size: number, step: number): number {
+  if (step === 0) return DEFAULT_FONT_SIZE;
+  return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, size + step));
+}
+
 /** 标题栏高度档位。界面已经固定成 20px，这里只为旧文档保留字段。 */
 const SPINE_SIZES = ["min", "normal", "max"] as const;
 
@@ -95,12 +134,25 @@ export const noteSchema = z.object({
   content: z.record(z.string(), contentSchema),
   paper: z.enum(PAPER),
   pattern: z.enum(PATTERN),
+  /** 正文字号，单位 px。旧文档没有这个字段，落回默认字号。 */
+  fontSize: z.number().default(DEFAULT_FONT_SIZE),
+  /** 是否显示 Markdown 工具栏。旧文档没有这个字段，按不显示处理。 */
+  toolbar: z.boolean().default(false),
+  /**
+   * 正文字体。存字符串而不是枚举：认不出的字体名照样能打开便签，
+   * 认不出来等于用户的便签打不开，那是更大的事故。
+   */
+  font: z.string().default(DEFAULT_FONT),
   pinned: z.boolean(),
   translucent: z.boolean(),
   collapsed: z.boolean(),
   spineSize: z.enum(SPINE_SIZES).default("min"),
   frame: rectSchema,
   expandedSize: sizeSchema.nullable(),
+  /** 是否处于放大态。窗口层负责改，前端只渲染状态不渲染它。 */
+  maximized: z.boolean().default(false),
+  /** 放大之前的 frame，窗口层用它恢复。 */
+  restoreFrame: rectSchema.nullable().default(null),
   zOrder: z.number(),
   visible: z.boolean(),
 });

@@ -165,6 +165,25 @@ body {
   --paper-alabasterGrey: #e7e7e4;
 }
 
+/* 正文字体。取值与 document.ts 的 FONTS 一致；没命中的 id 落回 :root 那档系统无衬线。
+   Maple Mono CN 由用户自己安装（没有 npm 包），所以只声明字体名并兜底系统等宽。 */
+.note[data-font="system"] {
+  --note-font: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+}
+.note[data-font="geist"] {
+  --note-font: "Geist Variable", -apple-system, sans-serif;
+}
+.note[data-font="songti"] {
+  --note-font: "Songti SC", "STSong", Georgia, serif;
+}
+.note[data-font="yuanti"] {
+  --note-font: "Yuanti SC", "YouYuan", "Songti SC", sans-serif;
+}
+.note[data-font="maple"] {
+  --note-font: "Maple Mono NF CN", "Maple Mono CN", ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+}
+
 /* 便签底色。默认值给灰档。 */
 .note {
   --note-paper: var(--paper-alabasterGrey);
@@ -226,11 +245,7 @@ body {
   background-size: 20px 20px;
 }
 
-/* 正文排版：新建便签的字号是 12 */
-.note-body {
-  font-size: 12px;
-  line-height: 1.5;
-}
+/* 正文排版。字号和行距在 note/chrome.css 里：字号跟着文档的 fontSize 走，不写死。 */
 .note-body h1,
 .note-body h2,
 .note-body h3,
@@ -241,14 +256,27 @@ body {
   font-weight: 600;
   line-height: 1.3;
 }
-.note-body h1 { font-size: 22px; }
-.note-body h2 { font-size: 18px; }
-.note-body h3 { font-size: 15px; }
+/* 标题按正文字号的倍数排（正文 14px 时约为 22/18/15/14），字号一改全都跟着走。 */
+.note-body h1 { font-size: 1.6em; }
+.note-body h2 { font-size: 1.3em; }
+.note-body h3 { font-size: 1.1em; }
 .note-body h4,
 .note-body h5,
-.note-body h6 { font-size: 13px; }
+.note-body h6 { font-size: 1em; }
 .note-body p {
   margin: 0 0 6px;
+}
+/* 引用 - 之前这条规则根本不存在，引用块只有浏览器默认的缩进，
+   在纸上和普通段落长得一模一样，用户点完看不出任何变化。 */
+.note-body blockquote {
+  margin: 0 0 6px;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--note-spine);
+  color: var(--note-muted);
+}
+/* 引用里的段落不额外再缩进一次，否则左边线离字太远。 */
+.note-body blockquote p {
+  margin: 0;
 }
 .note-body ul,
 .note-body ol {

@@ -10,14 +10,16 @@ import {
   type NoteContent,
   withPageContent,
   withWindowState,
+  scaleFontSize,
 } from "./document";
 import {
   alignNote,
-getNote,
+  getNote,
   hideNote,
   saveNote,
   setPinned,
   deleteNote,
+  toggleMaximize,
 } from "./storage";
 
 /** 编辑后延迟这么久再落盘，避免每敲一个字写一次文件。 */
@@ -75,6 +77,12 @@ export function NoteWindow({ id }: { id: string }) {
         const action = event.payload.action;
         if (action.kind === "appearance") {
           setNote((prev) => (prev ? { ...prev, ...action.patch } : prev));
+        } else if (action.kind === "fontScale") {
+          setNote((prev) =>
+            prev ? { ...prev, fontSize: scaleFontSize(prev.fontSize, action.step) } : prev,
+          );
+        } else if (action.kind === "font") {
+          setNote((prev) => (prev ? { ...prev, font: action.value } : prev));
         } else if (action.kind === "align") {
           // 对齐同样只动窗口，文档里的位置由 Rust 侧写好。
           applyWindowChange(alignNote(id, action.placement));
@@ -92,6 +100,45 @@ export function NoteWindow({ id }: { id: string }) {
     };
     // hideWindow / deleteWindow 只依赖 props 和 ref，不必随渲染重订阅。
   }, [id]);
+
+  /**
+   * Tab 只做缩进，不在便签的按钮之间跳。
+   *
+   * 焦点不在正文时（刚打开便签、或刚点过脊条上的按钮），Tab 会走浏览器默认行为：
+   * 高亮一路挪到下一个按钮上，看着像 Tab 失灵。正文里的 Tab 已经是缩进，
+   * 编辑器的键位自己会吃掉这个键；这里只补另一半：不在正文就把焦点带进正文，
+   * 于是「第一下 Tab 进来、第二下 Tab 缩进」，和别的编辑器一致。
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const body = document.querySelector<HTMLElement>(".note-body .ProseMirror");
+      if (!body || body.contains(event.target as Node)) return;
+      event.preventDefault();
+      body.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+  /**
+   * ⌘ +/- 缩放这张便签的字号，⌘0 回到默认。缩放只动当前便签，
+   * 和菜单里的「操作」走同一条规则，所以两处结果一致。
+   */
+  useEffect(() => {
+    const steps: Record<string, number> = { "+": 1, "=": 1, "-": -1, "0": 0 };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.metaKey) return;
+      const step = steps[event.key];
+      if (step === undefined) return;
+      // 不吃掉的话 webview 会连整个窗口一起缩放，脊条也跟着变粗。
+      event.preventDefault();
+      setNote((prev) =>
+        prev ? { ...prev, fontSize: scaleFontSize(prev.fontSize, step) } : prev,
+      );
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!note || note === lastSaved.current) return;
@@ -170,6 +217,9 @@ export function NoteWindow({ id }: { id: string }) {
       className="note flex h-full min-h-0 flex-col rounded-b-[10px]"
       data-paper={note.paper}
       data-pattern={note.pattern}
+      data-font={note.font}
+      // 字号挂在根上，正文和标题一起缩放；脊条和工具栏的图标尺寸固定。
+      style={{ fontSize: `${note.fontSize}px` }}
     >
       {/* 草稿还在，保存失败只提示不替换界面。 */}
       {error && (
@@ -193,6 +243,17 @@ export function NoteWindow({ id }: { id: string }) {
           onTogglePinned={() =>
             applyWindowChange(setPinned(id, !note.pinned))
           }
+          // 开关是纯界面状态，改文档就够，不需要动窗口。
+          onToggleToolbar={() =>
+            setNote((current) =>
+              current ? { ...current, toolbar: !current.toolbar } : current,
+            )
+          }
+          // 放大态不渲染任何东西，所以返回值只用来报错：窗口几何由 Rust 侧写回磁盘，
+          // 前端这份草稿里的旧 frame 不会被它覆盖（save_note 合并时以磁盘为准）。
+          onToggleMaximize={() => {
+            void toggleMaximize(id).catch((err: unknown) => setError(String(err)));
+          }}
         />
 
         <NoteEditor

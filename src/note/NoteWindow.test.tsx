@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { JSONContent } from "@tiptap/core";
 
-import type { Note } from "./document";
+import { DEFAULT_FONT, type Note } from "./document";
 
 const invoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -41,6 +41,10 @@ vi.mock("./editor", () => ({
       onChange={(event) => editor.onChange(JSON.parse(event.target.value))}
     />
   ),
+  // 工具栏本体在 editor.test.tsx 里用真实编辑器覆盖，这里只留一个标记节点。
+  NoteToolbar: () => <div className="note-toolbar" />,
+  // 字符数同理：真实实现挂在真实编辑器上，这里只留一个标记节点。
+  NoteStatus: () => <div className="note-status" />,
 }));
 
 const { NoteWindow } = await import("./NoteWindow");
@@ -64,12 +68,17 @@ function note(activeTab = "p1"): Note {
     content: { p1: page("第一页的正文"), p2: page("第二页的正文") },
     paper: "alabasterGrey",
     pattern: "plain",
+    fontSize: 14,
+    toolbar: false,
+    font: DEFAULT_FONT,
     pinned: false,
     translucent: false,
     collapsed: false,
     spineSize: "max",
     frame: { x: 0, y: 0, width: 300, height: 200 },
     expandedSize: null,
+    maximized: false,
+    restoreFrame: null,
     zOrder: 0,
     visible: true,
   };
