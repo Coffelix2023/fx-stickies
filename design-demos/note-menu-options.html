@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>便签「更多操作」三个菜单方向</title>
+<style>
+  :root {
+    --ink: #1c1915;
+    --paper: #e7e4dc;
+    --spine: #d8c7a2;
+    --line: rgb(28 25 21 / 14%);
+    --muted: #6d675f;
+    --danger: #9a3b32;
+    --alabasterGrey: oklch(92.71% 0.004 106.48);
+    --dustGrey: oklch(92.47% 0.001 106.43);
+    --blush: oklch(92.29% 0.015 50.8);
+    --apricot: oklch(92.72% 0.033 57.12);
+    --pearlBeige: oklch(95.31% 0.041 90.25);
+    --frozenWater: oklch(93.54% 0.019 180.26);
+    --paleSky: oklch(91.95% 0.026 242.76);
+    --thistle: oklch(89.92% 0.038 304.06);
+    --pastelPetal: oklch(90.57% 0.043 343.99);
+    --cottonRose: oklch(89.64% 0.046 13.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #efeae2;
+    color: var(--ink);
+    font-family: "Iowan Old Style", "Songti SC", "Source Han Serif SC", serif;
+  }
+  main {
+    width: 1440px;
+    min-height: 900px;
+    padding: 36px 40px 48px;
+  }
+  h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 560;
+    letter-spacing: 0;
+  }
+  .lead {
+    margin: 8px 0 28px;
+    max-width: 760px;
+    color: var(--muted);
+    font-family: "Avenir Next", "PingFang SC", sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+    align-items: start;
+  }
+  .card { display: flex; flex-direction: column; gap: 14px; }
+  .meta { font-family: "Avenir Next", "PingFang SC", sans-serif; }
+  .meta b { display: block; font-size: 16px; font-weight: 600; }
+  .meta span { display: block; margin-top: 4px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+  .stage {
+    height: 430px;
+    padding: 18px 18px 0;
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 35%), transparent 80px),
+      #f6f1ea;
+    border: 1px solid rgb(28 25 21 / 8%);
+    border-radius: 18px;
+  }
+  .note {
+    width: 280px;
+    overflow: hidden;
+    background: var(--paper);
+    border: 1px solid color-mix(in srgb, var(--spine) 65%, var(--paper));
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgb(70 52 28 / 10%);
+  }
+  .spine {
+    display: flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 6px 0 10px;
+    background: color-mix(in srgb, var(--paper) 32%, var(--spine));
+  }
+  .drag { flex: 1; }
+  .trigger {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    color: var(--ink);
+    background: rgb(255 255 255 / 55%);
+    border-radius: 6px;
+  }
+  .body {
+    height: 46px;
+    padding: 10px 12px;
+    color: rgb(28 25 21 / 72%);
+    font-family: "Avenir Next", "PingFang SC", sans-serif;
+    font-size: 13px;
+  }
+  .menu, .sub, .sheet {
+    color: var(--ink);
+    font-family: "Avenir Next", "PingFang SC", sans-serif;
+    font-size: 13px;
+    background: #fffdf8;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 16px 36px rgb(48 36 20 / 14%);
+  }
+  .row, .seg button, .close {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 30px;
+    padding: 0 10px;
+    color: inherit;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: 7px;
+  }
+  .row.on, .seg button.on { background: rgb(28 25 21 / 7%); }
+  .row.danger, .close { color: var(--danger); }
+  .sep { height: 1px; margin: 4px 8px; background: var(--line); }
+  .label {
+    padding: 6px 10px 3px;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+  .swatches, .seg { display: grid; gap: 6px; padding: 2px 8px 8px; }
+  .swatches { grid-template-columns: repeat(5, 1fr); }
+  .swatch, .chip {
+    height: 22px;
+    border: 1px solid rgb(28 25 21 / 18%);
+    border-radius: 6px;
+  }
+  .swatch.on, .chip.on { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .check::before { content: "✓"; width: 16px; font-size: 11px; }
+  .mark { width: 16px; color: transparent; }
+  .row.on .mark { color: var(--ink); }
+  .grow { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+  /* A · 命令菜单 + 外观子面板 */
+  .fly { position: relative; width: 168px; margin: 8px 0 0 auto; padding: 4px; }
+  .sub {
+    position: absolute;
+    top: 86px;
+    left: -214px;
+    width: 206px;
+    padding: 6px 0 2px;
+  }
+  .seg { grid-template-columns: repeat(3, 1fr); }
+  .seg button {
+    justify-content: center;
+    min-height: 26px;
+    padding: 0;
+    background: #f3efe8;
+  }
+
+  /* B · 一张纸色面板 */
+  .sheet {
+    width: 248px;
+    margin: 8px 0 0 auto;
+    padding: 8px;
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--frozenWater) 55%, white), #fffdf8 72px);
+  }
+  .sheet-head {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 2px 4px 8px;
+    font-size: 12px;
+  }
+  .now {
+    width: 14px;
+    height: 14px;
+    background: var(--frozenWater);
+    border: 1px solid rgb(28 25 21 / 20%);
+    border-radius: 4px;
+  }
+  .chips { display: flex; gap: 6px; padding: 0 2px 8px; }
+  .chip {
+    display: grid;
+    flex: 1;
+    place-items: center;
+    height: 28px;
+    font-size: 12px;
+    background:
+      radial-gradient(circle, rgb(28 25 21 / 28%) 0.8px, transparent 0.9px) 0 0 / 5px 5px,
+      #fff;
+  }
+  .chip:nth-child(1) { background: #fff; }
+  .chip:nth-child(3) {
+    background:
+      linear-gradient(rgb(28 25 21 / 16%) 1px, transparent 1px) 0 0 / 100% 6px,
+      linear-gradient(90deg, rgb(28 25 21 / 16%) 1px, transparent 1px) 0 0 / 6px 100%,
+      #fff;
+  }
+  .heights { display: grid; grid-template-columns: 42px 1fr; gap: 6px; align-items: center; padding: 0 4px 8px; }
+  .heights i {
+    display: block;
+    height: 8px;
+    background: color-mix(in srgb, var(--frozenWater) 40%, #c8b48a);
+    border-radius: 3px;
+  }
+  .heights button { min-height: 24px; }
+  .cmd { display: grid; grid-template-columns: 1fr 1fr 72px; gap: 6px; }
+
+  /* C · 图标命令条 */
+  .dock {
+    display: flex;
+    gap: 4px;
+    width: max-content;
+    margin: 8px 0 0 auto;
+    padding: 4px;
+    background: #fffdf8;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    box-shadow: 0 10px 24px rgb(48 36 20 / 12%);
+  }
+  .dock button {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    border-radius: 999px;
+  }
+  .dock button.on { background: var(--ink); color: var(--paper); }
+  .dock button.danger { color: var(--danger); }
+  .pop {
+    width: 210px;
+    margin: 8px 0 0 auto;
+    padding: 8px;
+    background: #fffdf8;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .plain { width: 12px; height: 12px; border: 1.5px solid currentColor; border-radius: 2px; }
+  .dots { width: 14px; height: 10px; background: radial-gradient(circle, currentColor 1px, transparent 1.1px) 0 0 / 4px 4px; }
+  .gridmark { width: 12px; height: 12px; border: 1.5px solid currentColor; background: linear-gradient(currentColor, currentColor) 50% 0 / 1px 100% no-repeat, linear-gradient(90deg, currentColor, currentColor) 0 50% / 100% 1px no-repeat; }
+</style>
+</head>
+<body>
+<main>
+  <h1>更多操作 · 三个看得见的方向</h1>
+  <p class="lead">同一张便签、同一组动作。差别只在菜单怎么装：命令和外观分开、全部铺在一张纸上，或先给一条图标命令。</p>
+  <div class="board">
+    <section class="card">
+      <div class="stage">
+        <article class="note">
+          <div class="spine"><div class="drag"></div><div class="trigger">···</div></div>
+          <div class="body">把牛奶放回冰箱</div>
+        </article>
+        <div class="fly menu">
+          <div class="row on"><span class="check"></span>置顶</div>
+          <div class="row"><span class="mark">›</span>折叠</div>
+          <div class="sep"></div>
+          <div class="row on">外观<span class="grow">›</span></div>
+          <div class="sep"></div>
+          <div class="row danger">关闭</div>
+          <div class="sub menu">
+            <div class="label">底色</div>
+            <div class="swatches">
+              <i class="swatch" style="background:var(--alabasterGrey)"></i>
+              <i class="swatch" style="background:var(--dustGrey)"></i>
+              <i class="swatch" style="background:var(--blush)"></i>
+              <i class="swatch" style="background:var(--apricot)"></i>
+              <i class="swatch" style="background:var(--pearlBeige)"></i>
+              <i class="swatch on" style="background:var(--frozenWater)"></i>
+              <i class="swatch" style="background:var(--paleSky)"></i>
+              <i class="swatch" style="background:var(--thistle)"></i>
+              <i class="swatch" style="background:var(--pastelPetal)"></i>
+              <i class="swatch" style="background:var(--cottonRose)"></i>
+            </div>
+            <div class="label">底纹</div>
+            <div class="seg"><button>无</button><button class="on">点阵</button><button>方格</button></div>
+            <div class="label">标题栏</div>
+            <div class="seg"><button class="on">紧凑</button><button>标准</button><button>宽松</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="meta"><b>A · 命令在前</b><span>主菜单只留置顶、折叠、外观、关闭。颜色和底纹进右侧子面板，用分段按钮而不是圆点列表。</span></div>
+    </section>
+
+    <section class="card">
+      <div class="stage">
+        <article class="note">
+          <div class="spine"><div class="drag"></div><div class="trigger">···</div></div>
+          <div class="body">把牛奶放回冰箱</div>
+        </article>
+        <div class="sheet">
+          <div class="sheet-head"><i class="now"></i>当前 · 霜蓝 / 点阵 / 紧凑</div>
+          <div class="label">底色</div>
+          <div class="swatches">
+            <i class="swatch" style="background:var(--alabasterGrey)"></i>
+            <i class="swatch" style="background:var(--dustGrey)"></i>
+            <i class="swatch" style="background:var(--blush)"></i>
+            <i class="swatch" style="background:var(--apricot)"></i>
+            <i class="swatch" style="background:var(--pearlBeige)"></i>
+            <i class="swatch on" style="background:var(--frozenWater)"></i>
+            <i class="swatch" style="background:var(--paleSky)"></i>
+            <i class="swatch" style="background:var(--thistle)"></i>
+            <i class="swatch" style="background:var(--pastelPetal)"></i>
+            <i class="swatch" style="background:var(--cottonRose)"></i>
+          </div>
+          <div class="label">底纹</div>
+          <div class="chips"><button class="chip">无</button><button class="chip on">点阵</button><button class="chip">方格</button></div>
+          <div class="label">标题栏</div>
+          <div class="heights"><button class="row on"><i></i></button><span>紧凑</span><button class="row"><i style="height:12px"></i></button><span>标准</span><button class="row"><i style="height:16px"></i></button><span>宽松</span></div>
+          <div class="sep"></div>
+          <div class="cmd"><button class="row on">置顶</button><button class="row">折叠</button><button class="close">关闭</button></div>
+        </div>
+      </div>
+      <div class="meta"><b>B · 一张纸</b><span>打开就能改外观。底纹用真实纹理，标题栏用三条不同高度。命令收在底部。</span></div>
+    </section>
+
+    <section class="card">
+      <div class="stage">
+        <article class="note">
+          <div class="spine"><div class="drag"></div><div class="trigger">···</div></div>
+          <div class="body">把牛奶放回冰箱</div>
+        </article>
+        <div class="dock">
+          <button class="on" title="置顶"><svg viewBox="0 0 16 16" width="14" height="14"><path d="M8 1.5 9.4 6H14l-3.7 2.7L11.7 14 8 11.2 4.3 14l1.4-5.3L2 6h4.6Z" fill="currentColor"/></svg></button>
+          <button title="折叠"><svg viewBox="0 0 16 16" width="14" height="14"><path d="M3 6.2 8 11l5-4.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+          <button title="外观"><svg viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8" r="5.2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 2.8a5.2 5.2 0 0 1 0 10.4Z" fill="currentColor"/></svg></button>
+          <button class="danger" title="关闭"><svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 3l10 10M13 3 3 13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+        </div>
+        <div class="pop">
+          <div class="label">底色</div>
+          <div class="swatches">
+            <i class="swatch" style="background:var(--alabasterGrey)"></i>
+            <i class="swatch" style="background:var(--dustGrey)"></i>
+            <i class="swatch" style="background:var(--blush)"></i>
+            <i class="swatch" style="background:var(--apricot)"></i>
+            <i class="swatch" style="background:var(--pearlBeige)"></i>
+            <i class="swatch on" style="background:var(--frozenWater)"></i>
+            <i class="swatch" style="background:var(--paleSky)"></i>
+            <i class="swatch" style="background:var(--thistle)"></i>
+            <i class="swatch" style="background:var(--pastelPetal)"></i>
+            <i class="swatch" style="background:var(--cottonRose)"></i>
+          </div>
+          <div class="label">底纹</div>
+          <div class="dock" style="margin:0 0 8px">
+            <button><i class="plain"></i></button><button class="on"><i class="dots"></i></button><button><i class="gridmark"></i></button>
+          </div>
+          <div class="label">标题栏</div>
+          <div class="seg"><button class="on">紧</button><button>中</button><button>宽</button></div>
+        </div>
+      </div>
+      <div class="meta"><b>C · 图标条</b><span>四个主动作变成贴着标题栏的圆形按钮。外观从「◐」再展开，菜单不再承担命令。</span></div>
+    </section>
+  </div>
+</main>
+</body>
+</html>

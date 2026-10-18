@@ -1,0 +1,306 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Geist Variable', sans-serif;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}
+
+/* 便签占满窗口高度 */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* 窗口透明，便签的圆角外面才是桌面而不是白色直角。非 layer 规则，压过 base layer 的 bg-background。 */
+html,
+body {
+  background: transparent;
+}
+
+/* 正文里的图像按所在栏宽度缩放，比例不变，不按原始像素撑开便签 */
+.note-body img {
+  width: 100%;
+  height: auto;
+}
+
+/* 底色板：十组色板各取 100 档作纸色、300 档作脊条，来源 docs/color/stickies-color.md。
+   菜单里的色块直接用 --paper-*，因此这里只定义一次。 */
+:root {
+  --paper-alabasterGrey: oklch(92.71% 0.004 106.48);
+  --spine-alabasterGrey: oklch(77.42% 0.01 106.63);
+  --paper-dustGrey: oklch(92.47% 0.001 106.43);
+  --spine-dustGrey: oklch(77.16% 0.007 106.56);
+  --paper-blush: oklch(92.29% 0.015 50.8);
+  --spine-blush: oklch(76.83% 0.048 53);
+  --paper-apricot: oklch(92.72% 0.033 57.12);
+  --spine-apricot: oklch(78.88% 0.103 56.39);
+  --paper-pearlBeige: oklch(95.31% 0.041 90.25);
+  --spine-pearlBeige: oklch(86.28% 0.116 88.65);
+  --paper-frozenWater: oklch(93.54% 0.019 180.26);
+  --spine-frozenWater: oklch(80.64% 0.055 180.07);
+  --paper-paleSky: oklch(91.95% 0.026 242.76);
+  --spine-paleSky: oklch(75.91% 0.081 243.98);
+  --paper-thistle: oklch(89.92% 0.038 304.06);
+  --spine-thistle: oklch(69.28% 0.123 301.57);
+  --paper-pastelPetal: oklch(90.57% 0.043 343.99);
+  --spine-pastelPetal: oklch(72.69% 0.134 347.02);
+  --paper-cottonRose: oklch(89.64% 0.046 13.08);
+  --spine-cottonRose: oklch(70.77% 0.152 17.72);
+}
+
+/* 便签底色与脊条颜色。默认值给第一档。 */
+.note {
+  --note-paper: var(--paper-alabasterGrey);
+  --note-spine: var(--spine-alabasterGrey);
+  background: var(--note-paper);
+  color: var(--note-ink);
+}
+:is(.note, .note-menu)[data-paper="alabasterGrey"] {
+  --note-paper: var(--paper-alabasterGrey);
+  --note-spine: var(--spine-alabasterGrey);
+}
+:is(.note, .note-menu)[data-paper="dustGrey"] {
+  --note-paper: var(--paper-dustGrey);
+  --note-spine: var(--spine-dustGrey);
+}
+:is(.note, .note-menu)[data-paper="blush"] {
+  --note-paper: var(--paper-blush);
+  --note-spine: var(--spine-blush);
+}
+:is(.note, .note-menu)[data-paper="apricot"] {
+  --note-paper: var(--paper-apricot);
+  --note-spine: var(--spine-apricot);
+}
+:is(.note, .note-menu)[data-paper="pearlBeige"] {
+  --note-paper: var(--paper-pearlBeige);
+  --note-spine: var(--spine-pearlBeige);
+}
+:is(.note, .note-menu)[data-paper="frozenWater"] {
+  --note-paper: var(--paper-frozenWater);
+  --note-spine: var(--spine-frozenWater);
+}
+:is(.note, .note-menu)[data-paper="paleSky"] {
+  --note-paper: var(--paper-paleSky);
+  --note-spine: var(--spine-paleSky);
+}
+:is(.note, .note-menu)[data-paper="thistle"] {
+  --note-paper: var(--paper-thistle);
+  --note-spine: var(--spine-thistle);
+}
+:is(.note, .note-menu)[data-paper="pastelPetal"] {
+  --note-paper: var(--paper-pastelPetal);
+  --note-spine: var(--spine-pastelPetal);
+}
+:is(.note, .note-menu)[data-paper="cottonRose"] {
+  --note-paper: var(--paper-cottonRose);
+  --note-spine: var(--spine-cottonRose);
+}
+
+
+/* 底纹 */
+.note[data-pattern="dots"] .note-body {
+  background-image: radial-gradient(
+    circle,
+    rgb(28 25 21 / 20%) 1px,
+    transparent 1.15px
+  );
+  background-size: 16px 16px;
+}
+.note[data-pattern="grid"] .note-body {
+  /* 方格用比 --note-line 更淡的一档：网格线铺满整页，边框那种浓度会抢正文。 */
+  background-image:
+    linear-gradient(var(--note-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--note-grid-line) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* 正文排版：新建便签的字号是 12 */
+.note-body {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.note-body h1,
+.note-body h2,
+.note-body h3,
+.note-body h4,
+.note-body h5,
+.note-body h6 {
+  margin: 0 0 6px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.note-body h1 { font-size: 22px; }
+.note-body h2 { font-size: 18px; }
+.note-body h3 { font-size: 15px; }
+.note-body h4,
+.note-body h5,
+.note-body h6 { font-size: 13px; }
+.note-body p {
+  margin: 0 0 6px;
+}
+.note-body ul,
+.note-body ol {
+  margin: 6px 0 0;
+  padding-left: 1.1em;
+}
+.note-body ul { list-style: disc; }
+.note-body ol { list-style: decimal; }
+.note-body hr {
+  margin: 8px 0;
+  border: 0;
+  border-top: 1px solid var(--note-line);
+}
+.note-body code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--note-ink) 8%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+}
+.note-body pre {
+  margin: 0 0 6px;
+  padding: 8px;
+  overflow-x: auto;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--note-ink) 8%, transparent);
+}
+.note-body pre code {
+  padding: 0;
+  background: transparent;
+}
+.note-body table {
+  width: 100%;
+  margin: 0 0 6px;
+  border-collapse: collapse;
+}
+.note-body th,
+.note-body td {
+  padding: 3px 6px;
+  border: 1px solid var(--note-line);
+  text-align: left;
+}

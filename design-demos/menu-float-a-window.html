@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>A · 独立原生子窗口</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --paper-alabasterGrey:oklch(92.71% 0.004 106.48); --spine-alabasterGrey:oklch(77.42% 0.01 106.63);
+  --paper-dustGrey:oklch(92.47% 0.001 106.43);      --spine-dustGrey:oklch(77.16% 0.007 106.56);
+  --paper-blush:oklch(92.29% 0.015 50.8);           --spine-blush:oklch(76.83% 0.048 53);
+  --paper-apricot:oklch(92.72% 0.033 57.12);        --spine-apricot:oklch(78.88% 0.103 56.39);
+  --paper-pearlBeige:oklch(95.31% 0.041 90.25);     --spine-pearlBeige:oklch(86.28% 0.116 88.65);
+  --paper-frozenWater:oklch(93.54% 0.019 180.26);   --spine-frozenWater:oklch(80.64% 0.055 180.07);
+  --paper-paleSky:oklch(91.95% 0.026 242.76);       --spine-paleSky:oklch(75.91% 0.081 243.98);
+  --paper-thistle:oklch(89.92% 0.038 304.06);       --spine-thistle:oklch(69.28% 0.123 301.57);
+  --paper-pastelPetal:oklch(90.57% 0.043 343.99);   --spine-pastelPetal:oklch(72.69% 0.134 347.02);
+  --paper-cottonRose:oklch(89.64% 0.046 13.08);     --spine-cottonRose:oklch(70.77% 0.152 17.72);
+  --note-ink:#1c1915; --note-line:rgb(28 25 21 / 16%);
+  --desk:#d6d3cd; --desk-ink:#5c574f;
+}
+body{
+  margin:0; background:#f2f0ec; color:#1c1915;
+  font:400 13px/1.5 'Geist Variable',-apple-system,'Helvetica Neue',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---- 便签本体：与 chrome.css 同一套公式 ---- */
+.note{
+  --note-paper:var(--paper-frozenWater); --note-spine:var(--spine-frozenWater);
+  position:relative; width:100%; background:var(--note-paper); color:var(--note-ink);
+  border:1px solid color-mix(in srgb, var(--note-spine) 65%, var(--note-paper));
+  border-radius:10px; overflow:hidden; display:flex; flex-direction:column;
+}
+.note-spine{
+  height:20px; flex:none; display:flex; align-items:center; gap:4px; padding:0 6px;
+  background:color-mix(in srgb, var(--note-paper) 32%, var(--note-spine));
+}
+.note-drag{flex:1; min-width:24px; height:100%}
+.note-action{
+  width:18px; height:18px; flex:none; border:0; border-radius:4px; padding:0;
+  background:transparent; color:color-mix(in srgb, var(--note-ink) 68%, var(--note-paper));
+  cursor:pointer; display:grid; place-items:center;
+}
+.note-action:hover{background:color-mix(in srgb, var(--note-paper) 60%, white); color:var(--note-ink)}
+.note-body{padding:6px 9px; word-break:break-word; font-size:12px; line-height:1.55;
+  color:color-mix(in srgb, var(--note-ink) 88%, var(--note-paper))}
+
+/* ---- 现有菜单样式：逐条对齐 note-menu.css ---- */
+.menu{
+  width:208px; padding:4px; border-radius:8px; font-size:13px;
+  background:rgba(255,255,255,.98); backdrop-filter:blur(20px) saturate(1.8);
+  border:1px solid rgba(0,0,0,.12);
+  box-shadow:0 4px 16px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.05);
+}
+.menu-label{padding:6px 12px 2px; font-size:11px; font-weight:500;
+  color:rgba(0,0,0,.5); text-transform:uppercase; letter-spacing:.5px}
+.menu-sep{margin:4px 0; height:1px; background:rgba(0,0,0,.08)}
+.menu-item{min-height:24px; padding:4px 12px; border-radius:4px; display:flex; align-items:center; gap:8px}
+.menu-item:hover{background:rgba(0,122,255,.08)}
+.swatches{display:grid; grid-template-columns:repeat(5,1fr); gap:6px; padding:6px 8px}
+.swatch{width:32px; height:28px; border-radius:4px; border:1px solid rgba(0,0,0,.12); position:relative}
+.swatch[data-checked="true"]::after{content:"✓"; position:absolute; inset:0; display:grid; place-items:center;
+  font-size:14px; font-weight:700; color:#fff; text-shadow:0 0 2px rgba(0,0,0,.8),0 1px 1px rgba(0,0,0,.5)}
+.menu-radio{position:relative; padding-left:28px}
+.menu-radio[data-checked="true"]::before{content:"✓"; position:absolute; left:10px; font-size:13px;
+  font-weight:600; color:rgb(0,122,255)}
+
+/* ---- macOS 原生菜单外观（方案 B） ---- */
+.nsmenu{
+  width:200px; padding:5px 0; border-radius:8px;
+  font:400 13px/1.35 -apple-system,'SF Pro Text','Helvetica Neue',sans-serif;
+  background:rgba(246,246,246,.86); backdrop-filter:blur(30px) saturate(1.6);
+  border:.5px solid rgba(0,0,0,.14);
+  box-shadow:0 0 0 .5px rgba(0,0,0,.06), 0 6px 20px rgba(0,0,0,.16);
+}
+.nsmenu-row{display:flex; align-items:center; justify-content:space-between;
+  height:22px; padding:0 10px 0 18px}
+.nsmenu-row:hover{background:rgba(0,122,255,.85); color:#fff}
+.nsmenu-sep{height:1px; margin:5px 10px; background:rgba(0,0,0,.1)}
+.nsmenu-arrow{font-size:11px; opacity:.55}
+.nsmenu-row:hover .nsmenu-arrow{opacity:.9}
+.nsmenu-tick{width:12px; margin-left:-12px; font-size:12px}
+
+
+.page{max-width:960px;margin:0 auto;padding:30px 24px 48px}
+h1{font-size:18px;font-weight:600;margin:0 0 6px}
+.lead{font-size:13px;color:#55504a;margin:0 0 4px;max-width:760px}
+.verdict{font-size:13px;margin:14px 0 2px;color:#3f6b46;font-weight:500}
+.verdict.bad{color:#b03030}
+.cost{font-size:12px;color:#8a5a2b;margin:0 0 22px}
+section{margin:0 0 26px}
+h2{font-size:13px;font-weight:600;margin:0 0 8px;color:#3a3630}
+h2 small{font-weight:400;color:#8a857e;margin-left:8px}
+.desk{position:relative;height:480px;background:var(--desk);border-radius:12px;
+  border:1px solid rgba(0,0,0,.07);overflow:hidden}
+.win-label{position:absolute;font-size:10px;letter-spacing:.4px;color:var(--desk-ink);text-transform:uppercase}
+.clipline{position:absolute;border-top:2px dashed #c0392b}
+.cliplabel{position:absolute;font-size:11px;color:#c0392b;background:rgba(255,255,255,.85);
+  border-radius:3px;padding:1px 0;text-align:center}
+.notes{margin:26px 0 0;padding:16px 18px;background:#fff;border:1px solid rgba(0,0,0,.08);
+  border-radius:10px;font-size:12.5px;line-height:1.75;color:#3a3630}
+.notes b{font-weight:600}
+.notes ul{margin:6px 0 0;padding-left:18px}
+.notes li{margin:3px 0}
+.sim{color:#8a5a2b}
+</style></head><body><div class="page">
+<h1>A · 独立原生子窗口</h1>
+<p class="lead">点「…」时另开一个无边框透明窗口，把现有菜单原样渲染在里面，定位在便签旁边。菜单活在它自己的窗口里，便签多小都裁不到它。</p>
+<p class="verdict">不受便签尺寸限制，且完整保留现有色块网格设计。</p>
+<p class="cost">代价：多一个窗口 + 跨窗口通信；菜单点外面 / Esc / 失焦都要收回。</p>
+<section><h2>便签 200×150（接近缩放下限）<small>菜单高约 300px，比便签还高</small></h2><div class="desk" style="width:700px;height:480px"><div style="position:absolute;left:34px;top:40px;width:200px"><div class="note" style="width:200px;height:150px">
+    <div class="note-spine"><button class="note-action" aria-label="置顶"><svg width="12" height="12" viewBox="0 0 16 16"><path d="M8 1.2 9.3 5.6h4.3l-3.5 2.6 1.3 4.4L8 10.1l-3.4 2.5 1.3-4.4L2.4 5.6h4.3L8 1.2Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button><span class="note-drag"></span><button class="note-action" aria-label="更多操作"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.2" cy="8" r="1.35"/><circle cx="8" cy="8" r="1.35"/><circle cx="12.8" cy="8" r="1.35"/></svg></button></div>
+    <div class="note-body">本周重点：把三份 spec 的边界条件对齐，再决定菜单怎么浮。</div>
+  </div></div><div class="menu" style="position:absolute;left:252px;top:40px;box-shadow:0 10px 34px rgba(0,0,0,.22),0 2px 6px rgba(0,0,0,.10)"><div class="menu-sep"></div>
+  <div class="menu-label">底色</div>
+  <div class="swatches"><span class="swatch" data-checked="false" title="雪花灰" style="background:var(--paper-alabasterGrey)"></span><span class="swatch" data-checked="false" title="尘灰" style="background:var(--paper-dustGrey)"></span><span class="swatch" data-checked="false" title="藕粉" style="background:var(--paper-blush)"></span><span class="swatch" data-checked="false" title="杏橘" style="background:var(--paper-apricot)"></span><span class="swatch" data-checked="false" title="珍珠米" style="background:var(--paper-pearlBeige)"></span><span class="swatch" data-checked="true" title="霜蓝" style="background:var(--paper-frozenWater)"></span><span class="swatch" data-checked="false" title="天蓝" style="background:var(--paper-paleSky)"></span><span class="swatch" data-checked="false" title="蓟紫" style="background:var(--paper-thistle)"></span><span class="swatch" data-checked="false" title="樱粉" style="background:var(--paper-pastelPetal)"></span><span class="swatch" data-checked="false" title="玫瑰" style="background:var(--paper-cottonRose)"></span></div>
+  <div class="menu-sep"></div>
+  <div class="menu-label">底纹</div>
+  <div class="menu-item menu-radio">无</div>
+  <div class="menu-item menu-radio" data-checked="true">点阵</div>
+  <div class="menu-item menu-radio">方格</div>
+  <div class="menu-sep"></div>
+  <div class="menu-item">隐藏</div>
+  <div class="menu-item">删除</div></div><div style="position:absolute;left:246px;top:32px;width:220px;height:316px;border:1px dashed rgba(0,0,0,.3);border-radius:10px;pointer-events:none"></div><span class="win-label" style="left:36px;top:20px">便签窗口</span><span class="win-label" style="left:254px;top:20px">独立窗口 menu-n1</span></div></section><section><h2>便签 420×320（默认尺寸）<small>两种尺寸下表现完全一致</small></h2><div class="desk" style="width:700px;height:480px"><div style="position:absolute;left:34px;top:40px;width:420px"><div class="note" style="width:420px;height:320px">
+    <div class="note-spine"><button class="note-action" aria-label="置顶"><svg width="12" height="12" viewBox="0 0 16 16"><path d="M8 1.2 9.3 5.6h4.3l-3.5 2.6 1.3 4.4L8 10.1l-3.4 2.5 1.3-4.4L2.4 5.6h4.3L8 1.2Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button><span class="note-drag"></span><button class="note-action" aria-label="更多操作"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><circle cx="3.2" cy="8" r="1.35"/><circle cx="8" cy="8" r="1.35"/><circle cx="12.8" cy="8" r="1.35"/></svg></button></div>
+    <div class="note-body">本周重点：把三份 spec 的边界条件对齐，再决定菜单怎么浮。</div>
+  </div></div><div class="menu" style="position:absolute;left:472px;top:40px;box-shadow:0 10px 34px rgba(0,0,0,.22),0 2px 6px rgba(0,0,0,.10)"><div class="menu-sep"></div>
+  <div class="menu-label">底色</div>
+  <div class="swatches"><span class="swatch" data-checked="false" title="雪花灰" style="background:var(--paper-alabasterGrey)"></span><span class="swatch" data-checked="false" title="尘灰" style="background:var(--paper-dustGrey)"></span><span class="swatch" data-checked="false" title="藕粉" style="background:var(--paper-blush)"></span><span class="swatch" data-checked="false" title="杏橘" style="background:var(--paper-apricot)"></span><span class="swatch" data-checked="false" title="珍珠米" style="background:var(--paper-pearlBeige)"></span><span class="swatch" data-checked="true" title="霜蓝" style="background:var(--paper-frozenWater)"></span><span class="swatch" data-checked="false" title="天蓝" style="background:var(--paper-paleSky)"></span><span class="swatch" data-checked="false" title="蓟紫" style="background:var(--paper-thistle)"></span><span class="swatch" data-checked="false" title="樱粉" style="background:var(--paper-pastelPetal)"></span><span class="swatch" data-checked="false" title="玫瑰" style="background:var(--paper-cottonRose)"></span></div>
+  <div class="menu-sep"></div>
+  <div class="menu-label">底纹</div>
+  <div class="menu-item menu-radio">无</div>
+  <div class="menu-item menu-radio" data-checked="true">点阵</div>
+  <div class="menu-item menu-radio">方格</div>
+  <div class="menu-sep"></div>
+  <div class="menu-item">隐藏</div>
+  <div class="menu-item">删除</div></div><div style="position:absolute;left:466px;top:32px;width:220px;height:316px;border:1px dashed rgba(0,0,0,.3);border-radius:10px;pointer-events:none"></div><span class="win-label" style="left:36px;top:20px">便签窗口</span><span class="win-label" style="left:474px;top:20px">独立窗口 menu-n1</span></div></section>
+<div class="notes"><b>在真实 Tauri 里会发生什么</b>
+<ul>
+  <li>菜单是一个真实 <b>NSWindow</b>，层级独立，超出便签区域的部分渲染在桌面上，<b>不经过便签 webview</b>，所以永远不会被便签尺寸裁切。</li>
+  <li>菜单里的<b>色块、底纹勾选、当前纸色</b>需要从便签窗口传给菜单窗口（或让菜单窗口自己读同一份文档）。</li>
+  <li>选完要回传给便签窗口落盘：走 Tauri event 或让菜单窗口直接 invoke Rust。</li>
+  <li>失焦自动收起要靠 <code>WindowEvent::Focused(false)</code>，否则会出现「菜单窗留在桌面上没人管」。</li>
+</ul>
+<b class="sim">页面上是模拟：虚线框代表独立 NSWindow，浏览器里无法演示真实的窗口层级。</b></div>
+</div></body></html>

@@ -1,0 +1,77 @@
+/* 控件从纸色派生，十种底色共用同一套层级。
+   这几个变量放在根上：更多操作浮层挂在 body 上，继承不到 .note 的定义。 */
+:root {
+  --note-ink: #1c1915;
+  --note-line: rgb(28 25 21 / 16%);
+  /* 方格底纹专用：整页铺满，按 --note-line 的一半浓度。 */
+  --note-grid-line: rgb(28 25 21 / 8%);
+  --note-muted: color-mix(in srgb, var(--note-ink) 68%, var(--note-paper));
+  --note-hover: color-mix(in srgb, var(--note-paper) 60%, white);
+}
+.note {
+  border: 1px solid color-mix(in srgb, var(--note-spine) 65%, var(--note-paper));
+  caret-color: var(--note-ink);
+}
+
+.note ::selection {
+  background: var(--note-spine);
+  color: var(--note-ink);
+}
+
+
+
+/* 只有顶栏空白处拖动窗口，控件保留自己的点击区域。 */
+.note-spine {
+  height: 20px;
+  background: color-mix(in srgb, var(--note-paper) 32%, var(--note-spine));
+}
+
+.note-drag {
+  cursor: grab;
+}
+
+.note-drag:active {
+  cursor: grabbing;
+}
+
+.note-action {
+  border: 0;
+  background: transparent;
+  color: var(--note-muted);
+  cursor: pointer;
+  transition: background-color 140ms ease-out, color 140ms ease-out;
+}
+
+.note-action:hover {
+  background: var(--note-hover);
+  color: var(--note-ink);
+}
+
+
+.note-action[data-pinned="true"] {
+  background: var(--note-ink);
+  color: var(--note-paper);
+}
+
+
+.note .note-action:focus-visible {
+  outline: 2px solid var(--note-ink);
+  outline-offset: -3px;
+  box-shadow: none;
+}
+
+.note-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--note-spine) transparent;
+}
+
+.note-body .tiptap {
+  min-height: 100%;
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note .note-action {
+    transition: none;
+  }
+}
