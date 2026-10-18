@@ -24,7 +24,7 @@ export function NoteEditor({ note, onContentChange }: Props) {
       {/* 工具栏贴在脊条下面，正文自己缩到剩余高度。 */}
       {note.toolbar && <NoteToolbar editor={editor} />}
       <NoteBody editor={editor} />
-      <NoteStatus editor={editor} />
+      <NoteStatus editor={editor} size={note.statusSize} faded={note.statusFaded} />
     </div>
   );
 }

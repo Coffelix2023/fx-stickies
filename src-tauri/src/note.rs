@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::frame::{Rect, Size};
 
-/// 底色。前八个取自 `docs/color/Soft Pastel Dreams.png`（= `stickies-color.md` 的 style-2），
-/// `Porcelain` 和 `AlabasterGrey` 是补的中性色：色卡里没有近白也没有灰。
-/// 换色板前的旧颜色全部是 serde alias，读进来自动落到最接近的新色上，
+/// 底色分两组，各十枚：`docs/color/Soft Pastel Dreams.png`（= `stickies-color.md` 的 style-2，
+/// 其中 `Porcelain`/`AlabasterGrey` 是补的中性色）与
+/// `docs/color/Enchanted Forest Hues.png`（style-3），第二组是新增的，没有旧名要认。
 /// 磁盘上的文件不用重写，下次保存时自动写成新值。别删已有 alias：磁盘上还有
 /// 两代以前的文档（实测有一张 paper=mistBlue），认不出来就等于便签打不开。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,6 +35,18 @@ pub enum Paper {
     Porcelain,
     #[serde(alias = "dustGrey", alias = "ivory")]
     AlabasterGrey,
+    /// 第二组：`docs/color/Enchanted Forest Hues.png`（= `stickies-color.md` 的 style-3），
+    /// 抽屉里排在第一组右侧。新加的值没有旧名要认，所以没有 alias。
+    CharcoalBlue,
+    PineBlue,
+    Verdigris,
+    MutedOlive,
+    DrySage,
+    TuscanSun,
+    SunlitClay,
+    SandyBrown,
+    CoralGlow,
+    BurntPeach,
 }
 
 /// 底纹。
@@ -56,6 +68,31 @@ pub enum SpineSize {
     Max,
 }
 
+/// 标题栏这一组控件（脊条、工具栏、色块行）的尺寸档位。
+/// 各档的具体像素在 `src/note/chrome.css` 里从 `--chrome-scale` 派生，这里只存档位。
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ChromeSize {
+    Small,
+    #[default]
+    Normal,
+    Large,
+    /// 显式改名：camelCase 会把 `XLarge` 写成 `xLarge`，前端那边用的是 `xlarge`。
+    #[serde(rename = "xlarge")]
+    XLarge,
+}
+
+/// 右下角字符统计的字号档位。`off` 整行不渲染，其余三档的像素在 chrome.css。
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum StatusSize {
+    Off,
+    Small,
+    /// 默认档：旧文档没有这个字段，落回这一档。
+    #[default]
+    Normal,
+    Large,
+}
 /// 一张便签的完整文档。字段与设计文档一致。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -79,10 +116,16 @@ pub struct Note {
     /// 是否显示 Markdown 工具栏。默认不显示：便签窗口很窄，工具栏按需开。
     #[serde(default)]
     pub toolbar: bool,
-    /// 正文字体，取值见前端 `FONTS`。旧文档没有这个字段，落回默认字体。
-    #[serde(default = "default_font")]
-    pub font: String,
     pub spine_size: SpineSize,
+    /// 标题栏这一组控件的尺寸档位。旧文档没有这个字段，按默认档读进来。
+    #[serde(default)]
+    pub chrome_size: ChromeSize,
+    /// 右下角字符统计的字号档位。旧文档没有这个字段，按默认档读进来。
+    #[serde(default)]
+    pub status_size: StatusSize,
+    /// 字符统计是否用更淡的一档颜色。旧文档没有这个字段，按勾选读进来。
+    #[serde(default = "status_faded_default")]
+    pub status_faded: bool,
     pub frame: Rect,
     /// 折叠前保存的展开尺寸；未折叠时为 None。
     pub expanded_size: Option<Size>,
@@ -102,9 +145,10 @@ pub const DEFAULT_WIDTH: f64 = 420.0;
 pub const DEFAULT_HEIGHT: f64 = 320.0;
 /// 新建便签的正文默认字号。
 pub const DEFAULT_FONT_SIZE: f64 = 14.0;
-/// 手动缩放字号的上下限。再小读不清字，再大一行放不下几个字。
-pub const MIN_FONT_SIZE: f64 = 10.0;
-pub const MAX_FONT_SIZE: f64 = 28.0;
+/// 手动缩放字号的上下限。下限 8px 是「还认得出是字」的那一档；上限放到 100px，
+/// 让大字也够得着，再大一行就放不下几个字了。
+pub const MIN_FONT_SIZE: f64 = 8.0;
+pub const MAX_FONT_SIZE: f64 = 100.0;
 
 /// 手动缩放的下限。到下限还能看见脊条、分页条和几行正文；再小就点不到窗口按钮、也读不到字了。
 pub const MIN_WIDTH: f64 = 200.0;
@@ -118,18 +162,17 @@ pub fn empty_doc() -> serde_json::Value {
     })
 }
 
-/// 默认字体。和前端 `document.ts` 的 DEFAULT_FONT 是同一个值。
-pub const DEFAULT_FONT: &str = "system";
-
-/// `font` 的缺省值。serde 的 `default` 只认无参函数，所以写在这里。
-fn default_font() -> String {
-    DEFAULT_FONT.to_string()
-}
-
 /// `font_size` 的缺省值。serde 的 `default` 只认无参函数，所以写在这里。
 fn default_font_size() -> f64 {
     DEFAULT_FONT_SIZE
 }
+
+/// `status_faded` 的缺省值。bool 的 `serde(default)` 只会给 false，
+/// 而这一档的默认是勾选，所以必须显式指定。
+fn status_faded_default() -> bool {
+    true
+}
+
 impl Note {
     /// 新建便签：象牙底色、纯色底纹、可见。
     pub fn new(id: String, frame: Rect) -> Self {
@@ -147,8 +190,10 @@ impl Note {
             collapsed: false,
             font_size: DEFAULT_FONT_SIZE,
             toolbar: false,
-            font: DEFAULT_FONT.to_string(),
             spine_size: SpineSize::Min,
+            chrome_size: ChromeSize::Normal,
+            status_size: StatusSize::Normal,
+            status_faded: true,
             frame,
             expanded_size: None,
             maximized: false,
@@ -327,12 +372,48 @@ mod tests {
         assert_eq!(note.pattern, Pattern::Plain);
         assert_eq!(note.font_size, DEFAULT_FONT_SIZE);
         assert!(!note.toolbar);
-        assert_eq!(note.font, DEFAULT_FONT);
+        assert_eq!(note.chrome_size, ChromeSize::Normal);
+        assert_eq!(note.status_size, StatusSize::Normal);
+        assert!(note.status_faded);
         assert!(note.visible);
     }
 
     #[test]
-    fn document_without_font_fields_falls_back_to_defaults() {
+    fn chrome_size_uses_the_same_words_as_the_frontend() {
+        // 前端发来的是这四个词，认错一个就等于存不进盘。
+        for (value, text) in [
+            (ChromeSize::Small, "small"),
+            (ChromeSize::Normal, "normal"),
+            (ChromeSize::Large, "large"),
+            (ChromeSize::XLarge, "xlarge"),
+        ] {
+            assert_eq!(serde_json::to_value(value).unwrap(), serde_json::json!(text));
+            assert_eq!(
+                serde_json::from_value::<ChromeSize>(serde_json::json!(text)).unwrap(),
+                value
+            );
+        }
+    }
+
+    #[test]
+    fn status_size_uses_the_same_words_as_the_frontend() {
+        // off 是小写：前端枚举写的就是 "off"，camelCase 不会变，但这四个词必须完全对上。
+        for (value, text) in [
+            (StatusSize::Off, "off"),
+            (StatusSize::Small, "small"),
+            (StatusSize::Normal, "normal"),
+            (StatusSize::Large, "large"),
+        ] {
+            assert_eq!(serde_json::to_value(value).unwrap(), serde_json::json!(text));
+            assert_eq!(
+                serde_json::from_value::<StatusSize>(serde_json::json!(text)).unwrap(),
+                value
+            );
+        }
+    }
+
+    #[test]
+    fn document_without_later_fields_falls_back_to_defaults() {
         // 字号和工具栏是后加的字段，磁盘上早于它们的文档必须照常打开。
         let dir = test_dir();
         let note = Note::new(
@@ -341,19 +422,42 @@ mod tests {
         );
         let mut value = serde_json::to_value(&note).unwrap();
         let object = value.as_object_mut().unwrap();
+        // 字体功能删了，磁盘上早于它的文档仍带 font：读进来必须忽略这个键。
+        object.insert("font".into(), serde_json::json!("songti"));
         object.remove("fontSize");
         object.remove("toolbar");
         object.remove("maximized");
         object.remove("restoreFrame");
-        object.remove("font");
+        object.remove("chromeSize");
+        object.remove("statusSize");
+        object.remove("statusFaded");
         write_raw(&dir, "n1", &value);
 
         let loaded = load(&dir, "n1").unwrap();
         assert_eq!(loaded.font_size, DEFAULT_FONT_SIZE);
         assert!(!loaded.toolbar);
+        assert_eq!(loaded.chrome_size, ChromeSize::Normal);
+        assert_eq!(loaded.status_size, StatusSize::Normal);
+        assert!(loaded.status_faded);
         assert!(!loaded.maximized);
         assert_eq!(loaded.restore_frame, None);
-        assert_eq!(loaded.font, DEFAULT_FONT);
+    }
+
+    #[test]
+    fn status_faded_false_survives_save_and_load() {
+        // 默认是 true，于是 false 只能靠显式写入：存不回来等于开关按了没用。
+        let dir = test_dir();
+        let mut note = Note::new(
+            "n1".into(),
+            Rect::new(0.0, 0.0, DEFAULT_WIDTH, DEFAULT_HEIGHT),
+        );
+        note.status_faded = false;
+        note.status_size = StatusSize::Off;
+        save(&dir, &note).unwrap();
+
+        let loaded = load(&dir, "n1").unwrap();
+        assert!(!loaded.status_faded);
+        assert_eq!(loaded.status_size, StatusSize::Off);
     }
 
     #[test]
@@ -629,6 +733,28 @@ mod tests {
         assert!(serde_json::from_value::<Paper>(serde_json::json!("unknown")).is_err());
     }
 
+    #[test]
+    fn second_palette_writes_and_reads_back_the_names_the_frontend_uses() {
+        // 前端 document.ts 的 PAPER 是逐字对应这里的 camelCase 名字：
+        // 拼错一个字母，写出去的文档前端就再也读不回来。
+        for (written, expected) in [
+            ("charcoalBlue", Paper::CharcoalBlue),
+            ("pineBlue", Paper::PineBlue),
+            ("verdigris", Paper::Verdigris),
+            ("mutedOlive", Paper::MutedOlive),
+            ("drySage", Paper::DrySage),
+            ("tuscanSun", Paper::TuscanSun),
+            ("sunlitClay", Paper::SunlitClay),
+            ("sandyBrown", Paper::SandyBrown),
+            ("coralGlow", Paper::CoralGlow),
+            ("burntPeach", Paper::BurntPeach),
+        ] {
+            let parsed: Paper =
+                serde_json::from_value(serde_json::Value::String(written.into())).unwrap();
+            assert_eq!(parsed, expected);
+            assert_eq!(serde_json::to_value(expected).unwrap(), serde_json::json!(written));
+        }
+    }
     #[test]
     fn missing_file_is_an_io_error() {
         let dir = test_dir();

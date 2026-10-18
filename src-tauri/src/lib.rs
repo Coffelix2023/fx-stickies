@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use tauri::{
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow,
+    AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
 };
 
@@ -142,101 +142,6 @@ fn note_url(id: &str) -> WebviewUrl {
     WebviewUrl::App(format!("index.html?note={id}").into())
 }
 
-/// 菜单窗口的入口。菜单活在独立窗口里，便签再小也裁不到它。
-fn menu_url(id: &str) -> WebviewUrl {
-    WebviewUrl::App(format!("index.html?menu={id}").into())
-}
-
-/// 菜单窗口 label 前缀。它同时是「这个窗口是不是菜单」的判据。
-pub(crate) const MENU_LABEL_PREFIX: &str = "menu-";
-
-/// 菜单窗口的初始尺寸：卡片四周留 16px 给 CSS 阴影，并给菜单内容留出首次渲染余量。
-/// shortcut: 这 16px 是 note-menu.css 里 `.menu-window #root` 的 padding，两边要一致；
-/// 卡片靠这个内缩量和按钮错开，改一处要改两处。
-/// 初始高度必须覆盖完整菜单，否则窗口还没完成前端实测收窄时，字体子菜单会被底部裁掉。
-/// 卡片渲染后 NoteMenuWindow 会按实测高度收窄；二级菜单展开时再按实际矩形变宽。
-/// 宽度是二级菜单收起来时的宽度，展开宽度由 NoteMenuWindow 根据卡片和子菜单矩形计算。
-const MENU_WINDOW_WIDTH: f64 = 240.0;
-const MENU_WINDOW_HEIGHT: f64 = 480.0;
-
-/// 触发按钮的边长，前端 `NoteMenu` 的按钮就是 18×18。
-/// shortcut: 必须与 NoteMenu.tsx 的 size-[18px] 一致，改一处要改两处。
-const MENU_ANCHOR_SIZE: f64 = 18.0;
-
-/// 触发按钮在便签视口里的位置，CSS 像素。前端量出来交给窗口层换算屏幕坐标。
-#[derive(Debug, Clone, Copy, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MenuAnchor {
-    /// 按钮右边缘。
-    pub right: f64,
-    /// 按钮下边缘。
-    pub bottom: f64,
-}
-
-/// 菜单左上角在屏幕上的逻辑坐标。默认贴在按钮右下，放不下就往左上翻。
-fn menu_origin<R: Runtime>(note_window: &WebviewWindow<R>, anchor: MenuAnchor) -> Result<(f64, f64), String> {
-    let scale = note_window.scale_factor().map_err(|err| err.to_string())?;
-    let origin = note_window
-        .outer_position()
-        .map_err(|err| err.to_string())?
-        .to_logical::<f64>(scale);
-    // 窗口从按钮右下角开始排。卡片在窗口里内缩 16px 阴影留白，所以卡片看起来离按钮
-    // 16px；反过来提前留白会让窗口的透明区压住按钮 —— 指针落在按钮上却被菜单窗口
-    // 吃掉，按钮既收不到 hover 也点不到，「再点一次收起」就没法做。
-    let mut x = origin.x + anchor.right;
-    let mut y = origin.y + anchor.bottom;
-
-    if let Ok(Some(monitor)) = note_window.current_monitor() {
-        let monitor_scale = monitor.scale_factor();
-        let area = monitor.work_area();
-        let area_pos = area.position.to_logical::<f64>(monitor_scale);
-        let area_size = area.size.to_logical::<f64>(monitor_scale);
-        let max_x = area_pos.x + area_size.width;
-        let max_y = area_pos.y + area_size.height;
-        if x + MENU_WINDOW_WIDTH > max_x {
-            // 翻到按钮左边，并让开按钮本身的宽度，保证不压住按钮。
-            x = (origin.x + anchor.right - MENU_ANCHOR_SIZE - MENU_WINDOW_WIDTH).max(area_pos.x);
-        }
-        if y + MENU_WINDOW_HEIGHT > max_y {
-            y = (max_y - MENU_WINDOW_HEIGHT).max(area_pos.y);
-        }
-    }
-    Ok((x, y))
-}
-
-/// 打开便签的菜单窗口。菜单是便签的子窗口：跟随移动、层级在它之上，
-/// 便签关掉时一起消失。
-fn open_menu<R: Runtime>(
-    app: &AppHandle<R>,
-    id: &str,
-    anchor: MenuAnchor,
-) -> Result<(), String> {
-    let label = format!("{MENU_LABEL_PREFIX}{id}");
-    if let Some(existing) = app.get_webview_window(&label) {
-        existing.close().map_err(|err| err.to_string())?;
-    }
-    let note_window = app
-        .get_webview_window(id)
-        .ok_or_else(|| format!("便签 {id} 没有打开的窗口"))?;
-    let (x, y) = menu_origin(&note_window, anchor)?;
-    WebviewWindowBuilder::new(app, &label, menu_url(id))
-        .title("")
-        .inner_size(MENU_WINDOW_WIDTH, MENU_WINDOW_HEIGHT)
-        .position(x, y)
-        .decorations(false)
-        // 菜单自带 CSS 阴影，窗口本身不投影，否则会出现一圈方形阴影。
-        .transparent(true)
-        .shadow(false)
-        .resizable(false)
-        .skip_taskbar(true)
-        .parent(&note_window)
-        .map_err(|err| err.to_string())?
-        .build()
-        .map_err(|err| err.to_string())?;
-    Ok(())
-}
-
-/// 用给定 frame 显示一张便签。窗口 label 就是文档 uuid，已经存在时复用，不创建第二个。
 fn show_at<R: Runtime>(
     app: &AppHandle<R>,
     note: &Note,
@@ -448,15 +353,6 @@ fn delete_note<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(), String> 
     remove_note(&app, &dir, &id)
 }
 
-/// 弹出便签的「更多操作」菜单窗口。
-#[tauri::command]
-fn open_menu_window<R: Runtime>(
-    app: AppHandle<R>,
-    id: String,
-    anchor: MenuAnchor,
-) -> Result<(), String> {
-    open_menu(&app, &id, anchor)
-}
 
 /// 对齐的执行部分。`area` 由调用方给，测试才能喂假显示器数据。
 /// 窗口不在或拿不到可见区域时原样返回，不动窗口也不写盘。
@@ -560,15 +456,6 @@ fn toggle_maximize<R: Runtime>(app: AppHandle<R>, id: String) -> Result<Note, St
         current_area(&app, &id),
         &monitor_rects(&app),
     )
-}
-/// 收起菜单窗口。窗口不在时按成功处理，重复收起不出错。
-#[tauri::command]
-fn close_menu_window<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(), String> {
-    let label = format!("{MENU_LABEL_PREFIX}{id}");
-    match app.get_webview_window(&label) {
-        Some(window) => window.close().map_err(|err| err.to_string()),
-        None => Ok(()),
-    }
 }
 
 /// 窗口当前 frame；窗口不在时改用文档里的值。
@@ -689,8 +576,6 @@ pub fn run() {
             set_visible,
             delete_note,
             align_note,
-            open_menu_window,
-            close_menu_window,
             toggle_maximize
         ])
         .on_menu_event(|app, event| match notes_dir(app) {
@@ -700,24 +585,6 @@ pub fn run() {
         .on_window_event(|window, event| {
             let app = window.app_handle();
             match event {
-                // 菜单只是浮层：失去焦点就收起来，不留在桌面上。
-                tauri::WindowEvent::Focused(false)
-                    if window.label().starts_with(MENU_LABEL_PREFIX) =>
-                {
-                    let _ = window.close();
-                }
-                // 菜单关掉都要通知便签窗口一声（点外面、Escape、收起、点按钮关闭）。
-                // 不通知的话按钮以为菜单还开着，再点一次会去「关」一个已经关掉的窗口，
-                // 表现为点了没反应。
-                tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
-                    if window.label().starts_with(MENU_LABEL_PREFIX) =>
-                {
-                    if let Some(id) = window.label().strip_prefix(MENU_LABEL_PREFIX) {
-                        let _ = window
-                            .app_handle()
-                            .emit_to(id, "note-menu-closed", serde_json::json!({ "id": id }));
-                    }
-                }
                 // 拖动和缩放后把位置与尺寸记回文档，重启或强杀后仍在原处。
                 tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
                     if !frame_write_allowed(app, window.label()) {
@@ -970,52 +837,6 @@ mod tests {
         remove_note(app.handle(), &dir, "a").unwrap();
 
         assert_eq!(note::list_ids(&dir).unwrap(), vec!["b".to_string()]);
-    }
-
-    #[test]
-    fn menu_window_starts_at_the_button_corner() {
-        // MockRuntime 下窗口在 (0,0)，菜单窗口左上角就落在按钮的右下角：
-        // 再往回缩就会盖住按钮，按钮点不到、也收不到 hover。
-        // shortcut: 真正建窗口要 bind 真实 NSWindow，MockRuntime 会段错，
-        // 所以这里只钉定位；窗口能否建出来由实机验收覆盖。
-        let app = mock_app();
-        let note = test_note("n1");
-        let window = show_at(app.handle(), &note, note.frame).unwrap();
-
-        let (x, y) = menu_origin(
-            &window,
-            MenuAnchor {
-                right: 200.0,
-                bottom: 20.0,
-            },
-        )
-        .unwrap();
-
-        assert_eq!(x, 200.0);
-        assert_eq!(y, 20.0);
-    }
-
-    #[test]
-    fn menu_window_without_its_note_is_an_error() {
-        let app = mock_app();
-
-        let opened = open_menu(
-            app.handle(),
-            "没有这个",
-            MenuAnchor {
-                right: 0.0,
-                bottom: 0.0,
-            },
-        );
-
-        assert!(opened.is_err());
-    }
-
-    #[test]
-    fn closing_a_menu_window_that_is_not_open_is_fine() {
-        let app = mock_app();
-
-        assert!(close_menu_window(app.handle().clone(), "n1".into()).is_ok());
     }
 
     #[test]

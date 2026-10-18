@@ -1,10 +1,10 @@
-import { listen } from "@tauri-apps/api/event";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef, useState } from "react";
 
 import { NoteEditor } from "./NoteEditor";
+import { PaperDrawer } from "./PaperDrawer";
 import { NoteSpine } from "./NoteSpine";
-import { type NoteMenuEvent } from "./NoteMenuPanel";
+import { type NoteMenuAction } from "./NoteMenu";
 import {
   type Note,
   type NoteContent,
@@ -32,9 +32,11 @@ export const SAVE_DELAY_MS = 400;
 export function NoteWindow({ id }: { id: string }) {
   const [note, setNote] = useState<Note | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** 底色抽屉开没开。纯界面状态，不进文档，也不用落盘。 */
+  const [paperOpen, setPaperOpen] = useState(false);
   const lastSaved = useRef<Note | null>(null);
 
-  /** 同时只有一次保存在途，用序号判断谁的返回值才算数。 */
+  /** 保存请求可能重叠，用序号判断谁的返回值才算数：晚到的旧结果不推进界面状态。 */
   const saveSeq = useRef(0);
 
   /** 菜单跑在另一个窗口里，它回传的动作要落到最新这份草稿上，所以走 ref。 */
@@ -62,44 +64,33 @@ export function NoteWindow({ id }: { id: string }) {
   }, [note]);
 
   /**
-   * 菜单窗口的动作回传。菜单自己不改文档：最新草稿在便签窗口手里，
-   * 由它统一落盘，避免两个窗口互相覆盖。
+   * 菜单动作。原生菜单就开在这个窗口里，点完直接调用，没有跨窗口的回传，
+   * 所以最新草稿直接用 state 就行，不用绕 ref。
    */
-  useEffect(() => {
-    const pending = listen<NoteMenuEvent>(
-      "note-menu-action",
-      (event) => {
-        // 兜底：Tauri 里 target 为 Any 的监听者会收到全部 emit，
-        // 只声明具体 target 还不够保险，这里再核一次归属。
-        if (event.payload.id !== id) return;
-        const current = noteRef.current;
-        if (!current) return;
-        const action = event.payload.action;
-        if (action.kind === "appearance") {
-          setNote((prev) => (prev ? { ...prev, ...action.patch } : prev));
-        } else if (action.kind === "fontScale") {
-          setNote((prev) =>
-            prev ? { ...prev, fontSize: scaleFontSize(prev.fontSize, action.step) } : prev,
-          );
-        } else if (action.kind === "font") {
-          setNote((prev) => (prev ? { ...prev, font: action.value } : prev));
-        } else if (action.kind === "align") {
-          // 对齐同样只动窗口，文档里的位置由 Rust 侧写好。
-          applyWindowChange(alignNote(id, action.placement));
-        } else if (action.kind === "hide") {
-          void hideWindow(current);
-        } else {
-          void deleteWindow();
-        }
-      },
-      // 不声明 target 就是 Any，会把别的便签的菜单动作也收进来。
-      { target: { kind: "WebviewWindow", label: id } },
-    );
-    return () => {
-      void pending.then((unlisten) => unlisten());
-    };
-    // hideWindow / deleteWindow 只依赖 props 和 ref，不必随渲染重订阅。
-  }, [id]);
+  function runAction(action: NoteMenuAction) {
+    if (action.kind === "appearance") {
+      setNote((prev) => (prev ? { ...prev, ...action.patch } : prev));
+    } else if (action.kind === "chromeSize") {
+      // 标题栏这组控件的档位：具体像素在 chrome.css，这里只落档位。
+      setNote((prev) => (prev ? { ...prev, chromeSize: action.size } : prev));
+    } else if (action.kind === "statusSize") {
+      // 同理：像素在 chrome.css，这里只落档位。off 只是不渲染这一行，不删字段。
+      setNote((prev) => (prev ? { ...prev, statusSize: action.size } : prev));
+    } else if (action.kind === "statusFaded") {
+      setNote((prev) => (prev ? { ...prev, statusFaded: action.faded } : prev));
+    } else if (action.kind === "fontScale") {
+      setNote((prev) =>
+        prev ? { ...prev, fontSize: scaleFontSize(prev.fontSize, action.step) } : prev,
+      );
+    } else if (action.kind === "align") {
+      // 对齐同样只动窗口，文档里的位置由 Rust 侧写好。
+      applyWindowChange(alignNote(id, action.placement));
+    } else if (action.kind === "hide") {
+      if (note) void hideWindow(note);
+    } else {
+      void deleteWindow();
+    }
+  }
 
   /**
    * Tab 只做缩进，不在便签的按钮之间跳。
@@ -217,8 +208,9 @@ export function NoteWindow({ id }: { id: string }) {
       className="note flex h-full min-h-0 flex-col rounded-b-[10px]"
       data-paper={note.paper}
       data-pattern={note.pattern}
-      data-font={note.font}
-      // 字号挂在根上，正文和标题一起缩放；脊条和工具栏的图标尺寸固定。
+      // 标题栏档位写在这里，chrome.css 据此缩放脊条、工具栏和色块行。
+      data-chrome-size={note.chromeSize}
+      // 字号挂在根上，正文和标题一起缩放；标题栏那组控件走上面的 chromeSize。
       style={{ fontSize: `${note.fontSize}px` }}
     >
       {/* 草稿还在，保存失败只提示不替换界面。 */}
@@ -244,17 +236,37 @@ export function NoteWindow({ id }: { id: string }) {
             applyWindowChange(setPinned(id, !note.pinned))
           }
           // 开关是纯界面状态，改文档就够，不需要动窗口。
-          onToggleToolbar={() =>
+          onToggleToolbar={() => {
+            // 工具栏和底色抽屉抢脊条下面那一行，开一个就得收另一个。
+            setPaperOpen(false);
             setNote((current) =>
               current ? { ...current, toolbar: !current.toolbar } : current,
-            )
-          }
+            );
+          }}
+          paperOpen={paperOpen}
+          onTogglePaperDrawer={() => {
+            // 同上：收掉工具栏，抽屉才有那一行。
+            setNote((current) =>
+              current && !paperOpen ? { ...current, toolbar: false } : current,
+            );
+            setPaperOpen((open) => !open);
+          }}
           // 放大态不渲染任何东西，所以返回值只用来报错：窗口几何由 Rust 侧写回磁盘，
           // 前端这份草稿里的旧 frame 不会被它覆盖（save_note 合并时以磁盘为准）。
           onToggleMaximize={() => {
             void toggleMaximize(id).catch((err: unknown) => setError(String(err)));
           }}
+          onMenuAction={runAction}
         />
+        {/* 底色抽屉贴在脊条下面，和工具栏同一个位置。 */}
+        {paperOpen && (
+          <PaperDrawer
+            current={note.paper}
+            onPick={(paper) =>
+              setNote((current) => (current ? { ...current, paper } : current))
+            }
+          />
+        )}
 
         <NoteEditor
           note={note}

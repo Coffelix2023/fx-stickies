@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { readFileSync } from "node:fs";
 
@@ -37,6 +37,11 @@ function paste(target: Element, text: string, html?: string) {
 }
 
 afterEach(cleanup);
+
+/** 滚动箭头到头了会置灰而不是消失。没装 jest-dom，直接读属性。 */
+function disabled(el: HTMLElement): boolean {
+  return (el as HTMLButtonElement).disabled;
+}
 
 /** 只挂一个编辑器，不渲染任何界面：按键和计数行为用不着看得见的东西。 */
 function Harness({
@@ -419,7 +424,7 @@ describe("右下角字符数", () => {
   }) {
     const editor = useNoteEditor(content, () => {}, "p1");
     expose(editor);
-    return <NoteStatus editor={editor} />;
+    return <NoteStatus editor={editor} size="small" faded />;
   }
 
   const doc = (): NoteContent => ({
@@ -528,19 +533,45 @@ describe("块级命令与样式", () => {
     expect(editor.getJSON().content?.[0].content).toHaveLength(2);
   });
 
-  it("便签窄到装不下时，工具栏右侧渐隐提示还有更多项", async () => {
+  it("便签窄到装不下时两端架箭头，滚到头对应那端变禁用", async () => {
     render(<ToolbarBar content={para("要点")} expose={() => {}} />);
-    const bar = document.querySelector(".note-toolbar") as HTMLElement;
+    const track = document.querySelector(".note-toolbar-track") as HTMLElement;
     // jsdom 不做布局，宽度得自己造：内容 400px、窗口只有 200px
-    Object.defineProperty(bar, "scrollWidth", { value: 400, configurable: true });
-    Object.defineProperty(bar, "clientWidth", { value: 200, configurable: true });
+    Object.defineProperty(track, "scrollWidth", { value: 400, configurable: true });
+    Object.defineProperty(track, "clientWidth", { value: 200, configurable: true });
+    const scrollBy = vi.fn();
+    Object.defineProperty(track, "scrollBy", { value: scrollBy, configurable: true });
 
-    fireEvent.scroll(bar);
-    await waitFor(() => expect(bar.getAttribute("data-more")).toBe("true"));
-    // 渐隐挂在 data-more 上，滚到底自动消失，否则一直挂着会骗人
-    Object.defineProperty(bar, "scrollLeft", { value: 200, configurable: true });
-    fireEvent.scroll(bar);
-    await waitFor(() => expect(bar.getAttribute("data-more")).toBe("false"));
+    // 还没滚：两枚都在，左边那枚到头了所以禁用，右侧渐隐也挂上
+    fireEvent.scroll(track);
+    await waitFor(() => expect(track.getAttribute("data-more")).toBe("true"));
+    const left = screen.getByRole("button", { name: "向左看前面的工具项" });
+    const right = screen.getByRole("button", { name: "向右看后面的工具项" });
+    expect(disabled(left)).toBe(true);
+    expect(disabled(right)).toBe(false);
+    fireEvent.click(right);
+    expect(scrollBy).toHaveBeenCalledWith({ left: 60, behavior: "smooth" });
+
+    // 滚到底：两枚都还在，右边那枚换成禁用，渐隐收掉
+    Object.defineProperty(track, "scrollLeft", { value: 200, configurable: true });
+    fireEvent.scroll(track);
+    await waitFor(() => expect(track.getAttribute("data-more")).toBe("false"));
+    expect(disabled(screen.getByRole("button", { name: "向右看后面的工具项" }))).toBe(true);
+    expect(disabled(left)).toBe(false);
+    fireEvent.click(left);
+    expect(scrollBy).toHaveBeenLastCalledWith({ left: -60, behavior: "smooth" });
+  });
+
+  it("装得下时两枚箭头都不出现", async () => {
+    render(<ToolbarBar content={para("要点")} expose={() => {}} />);
+    const track = document.querySelector(".note-toolbar-track") as HTMLElement;
+    Object.defineProperty(track, "scrollWidth", { value: 200, configurable: true });
+    Object.defineProperty(track, "clientWidth", { value: 200, configurable: true });
+
+    fireEvent.scroll(track);
+
+    await waitFor(() => expect(track.getAttribute("data-more")).toBe("false"));
+    expect(document.querySelector(".note-scroll-arrows")).toBeNull();
   });
 
   it("标记类命令不碰选区", async () => {

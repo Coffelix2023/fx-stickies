@@ -2,7 +2,6 @@
    派生变量必须和 --note-paper 声明在同一个元素上：自定义属性的 var() 在声明处替换，
    写在 :root 上时那里还没有 --note-paper，--note-muted / --note-hover 会整条失效。 */
 :root {
-  --note-font: sans-serif;
   --note-ink: #1c1915;
   --note-line: rgb(28 25 21 / 16%);
   /* 方格底纹专用：整页铺满，按 --note-line 的一半浓度。 */
@@ -11,19 +10,36 @@
 .note {
   --note-muted: color-mix(in srgb, var(--note-ink) 68%, var(--note-paper));
   --note-hover: color-mix(in srgb, var(--note-paper) 60%, white);
+  /* 激活态（脊条按钮按下、工具栏项生效）的文字色。默认取纸色：浅色纸上
+     「深底浅字」。深色纸上纸色本身已经比 --note-spine 还暗，对比掉到 1.05:1，
+     所以 App.css 里那两档深色纸各自把它翻成 --note-ink。 */
+  --note-on-spine: var(--note-paper);
+  /* 标题栏这一组控件（脊条 + 工具栏 + 色块行）的整体缩放。高度、按钮、图标、
+     色块都从这一个数派生：换档位只改下面的倍数，不用逐处改像素。
+     菜单「尺寸 > 标题栏」写的是 data-chrome-size，见本文件末尾的四档。 */
+  --chrome-scale: 1;
+  --chrome-h: calc(20px * var(--chrome-scale));
+  --chrome-btn: calc(18px * var(--chrome-scale));
+  --chrome-icon: calc(12px * var(--chrome-scale));
+  --chrome-chip: calc(14px * var(--chrome-scale));
+  /* 工具栏的字形比脊条图标略大一点，单独一档：默认档仍是原来的 13px。 */
+  --chrome-tool-icon: calc(13px * var(--chrome-scale));
+  --chrome-arrow: calc(16px * var(--chrome-scale));
   border: 1px solid color-mix(in srgb, var(--note-spine) 65%, var(--note-paper));
   caret-color: var(--note-ink);
 }
 .note ::selection {
-  background: var(--note-spine);
-  color: var(--note-ink);
+  /* 选区取反：ink 底 + paper 字。深色纸上照样反得过来；
+     原来用脊条色，深色纸上是深底浅字，选中前后看着一样。 */
+  background: var(--note-ink);
+  color: var(--note-paper);
 }
 
 
 
 /* 只有顶栏空白处拖动窗口，控件保留自己的点击区域。 */
 .note-spine {
-  height: 20px;
+  height: var(--chrome-h);
   background: color-mix(in srgb, var(--note-paper) 32%, var(--note-spine));
 }
 
@@ -49,11 +65,13 @@
 }
 
 /* 两个开关按钮的激活态，形状和底色一起变：
-   线框图标 = 关，填实图标 = 开。只换底色的话在浅色纸上几乎看不出来。 */
+   线框图标 = 关，填实图标 = 开。只换底色的话在浅色纸上几乎看不出来。
+   前景取 --note-on-spine 而不是纸色：深色纸上纸色比 --note-spine 还暗，
+   写成纸色等于把图标涂在自家底色上。 */
 .note-action[data-pinned="true"],
 .note-action[data-on="true"] {
   background: var(--note-spine);
-  color: var(--note-paper);
+  color: var(--note-on-spine);
 }
 
 /* 激活色跟随便签底色：--note-spine 是同一色系的深色档（App.css 里纸色取 100 档、脊条取 300 档）。 */
@@ -62,29 +80,38 @@
   fill: currentColor;
 }
 
-/* 工具栏 - 与脊条同高 20px，贴在脊条下面。便签最窄能缩到 200px，
+/* 工具栏 - 与脊条同高（默认 20px），贴在脊条下面。便签最窄能缩到 200px，
    所以这一行横向滚动，不换行也不撑高窗口。 */
 .note-toolbar {
   display: flex;
   flex: none;
   align-items: center;
-  height: 20px;
-  gap: 2px;
-  padding: 0 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  height: var(--chrome-h);
+  gap: calc(2px * var(--chrome-scale));
+  padding: 0 calc(4px * var(--chrome-scale));
   background: color-mix(in srgb, var(--note-paper) 32%, var(--note-spine));
   border-bottom: 1px solid var(--note-line);
 }
 
-.note-toolbar::-webkit-scrollbar {
+/* 横向滚动的是里面这一层，外层留给两端的箭头。 */
+.note-toolbar-track {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.note-toolbar-track::-webkit-scrollbar {
   display: none;
 }
 
 /* 便签窄了工具栏装不下，靠横向滚动。右侧渐隐就是「还有更多项」的提示：
    滚到底自动消失，mask 不随内容滚动，所以只在真的有溢出时挂上。 */
-.note-toolbar[data-more="true"] {
-  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+.note-toolbar-track[data-more="true"] {
+  mask-image: linear-gradient(to right, #000 calc(100% - calc(16px * var(--chrome-scale))), transparent);
 }
 
 .note-toolbar-group {
@@ -98,25 +125,138 @@
   display: grid;
   flex: none;
   place-items: center;
-  width: 18px;
-  height: 16px;
+  width: var(--chrome-btn);
+  height: calc(16px * var(--chrome-scale));
   border-radius: 3px;
 }
 
 /* 生效中的标记跟着选区亮，选过的格式不用回头确认。 */
 .note-toolbar-item[data-active="true"] {
   background: var(--note-spine);
-  color: var(--note-paper);
+  color: var(--note-on-spine);
 }
 
 .note-toolbar-sep {
   flex: none;
   width: 1px;
-  height: 10px;
-  margin: 0 3px;
+  height: calc(10px * var(--chrome-scale));
+  margin: 0 calc(3px * var(--chrome-scale));
   background: var(--note-line);
 }
 
+/* 底色抽屉 - 和工具栏同一个位置：贴在脊条下面，正文自己缩到剩余高度。
+   两组色板共二十枚，一行放不下就横向滚动，溢出时两端架箭头。 */
+.note-paper-drawer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: calc(2px * var(--chrome-scale));
+  height: var(--chrome-h);
+  padding: 0 calc(2px * var(--chrome-scale));
+  background: color-mix(in srgb, var(--note-paper) 32%, var(--note-spine));
+  border-bottom: 1px solid var(--note-line);
+}
+
+/* 横向滚动区：宽度跟着便签走，滚动条藏起来（换成箭头）。 */
+.paper-color-track {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.paper-color-track::-webkit-scrollbar {
+  display: none;
+}
+
+/* 色块行容器。width: max-content 是关键：不写的话 flex 会把二十枚压扁，
+   溢出也就永远不会发生，箭头也就永远不出现。 */
+.paper-color-grid {
+  display: flex;
+  gap: calc(4px * var(--chrome-scale));
+  width: max-content;
+}
+
+/* 两组色板之间的竖线 */
+.paper-color-sep {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  margin: calc(3px * var(--chrome-scale)) 2px;
+  background: var(--note-line);
+}
+
+/* 横向滚动的箭头。色块行和工具栏共用。
+   箭头不画底：--note-spine 是「纸色压深一档」派生的，跟 --note-paper 的对比度
+   只有 1.2:1，深浅两张纸上胶囊都会糊成一团。所以改用 --note-ink —— 它是纸色的
+   满对比色（约 17:1），浅纸上黑箭头、深纸上白箭头，两边都看得清。
+   两枚成对出现，到头那枚靠 :disabled 变淡，这一行的宽度不会随着滚动变来变去。 */
+.note-scroll-arrows {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: calc(2px * var(--chrome-scale));
+  /* 与工具项之间留 5px，再加一道竖线划出归属：箭头和工具项一眼分得开。 */
+  padding-right: calc(4px * var(--chrome-scale));
+  margin-right: calc(3px * var(--chrome-scale));
+  border-right: 1px solid var(--note-line);
+}
+
+.note-scroll-arrow {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--chrome-arrow);
+  height: var(--chrome-arrow);
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--note-ink);
+  cursor: pointer;
+}
+
+.note-scroll-arrow:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--note-ink) 14%, transparent);
+}
+
+/* 到头了：这枚还在，但按下没反应，得一眼看出它不顶用。 */
+.note-scroll-arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.note-scroll-arrow:focus-visible {
+  outline: 2px solid var(--note-ink);
+  outline-offset: -2px;
+}
+
+/* 色块项 - 圆角方块，选中用高亮色边框 */
+.paper-color-item {
+  width: var(--chrome-chip);
+  height: var(--chrome-chip);
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.paper-color-item:hover {
+  border-color: rgba(0, 0, 0, 0.2);
+  transform: scale(1.08);
+}
+
+.paper-color-item:focus-visible {
+  outline: 2px solid rgba(0, 122, 255, 0.8);
+  outline-offset: 1px;
+}
+
+/* 选中态 - 高亮描边环。色块本身是浅色，白色对勾压在中间几乎看不见。 */
+.paper-color-item[data-state="checked"] {
+  outline: 2px solid rgb(0 122 255);
+  outline-offset: 1px;
+}
 
 .note .note-action:focus-visible {
   outline: 2px solid var(--note-ink);
@@ -127,7 +267,7 @@
 /* 正文排版：字号挂在便签根上（.note 的 inline style），这里只管行距。
    标题用 em，跟着字号一起缩放，改字号不用另改一遍标题规则。 */
 .note-body {
-  font-family: var(--note-font, sans-serif);
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
   font-size: inherit;
   line-height: 1.5;
   scrollbar-width: thin;
@@ -141,19 +281,56 @@
   white-space: pre-wrap;
 }
 
-/* 右下角常驻的字符数 - 固定一行，正文因此矮 15px。便签最小 120px，仍装得下正文。 */
+/* 右下角常驻的字符数 - 固定一行，默认档下正文因此矮 26px。便签最小 120px，仍装得下正文。
+   四边内边距统一：右/底相等，数字才不会贴在便签角上。
+   字号档位由文档的 statusSize 决定，颜色浓淡由 statusFaded 决定，都挂在 data 属性上。 */
 .note-status {
   display: flex;
   flex: none;
   justify-content: flex-end;
-  padding: 0 10px 3px;
+  padding: 6px;
   color: var(--note-muted);
   font-size: 10px;
-  line-height: 12px;
+  line-height: 14px;
+}
+
+/* 半透明：把 ink 的混入比例压到 45%，比 --note-muted 的 68% 淡一档。
+   用 color-mix 而不是 opacity，小字号下笔画不发虚，深色纸也能单独调。 */
+.note-status[data-faded="true"] {
+  color: color-mix(in srgb, var(--note-ink) 45%, var(--note-paper));
+}
+
+.note-status[data-status-size="off"] {
+  display: none;
+}
+
+.note-status[data-status-size="normal"] {
+  font-size: 12px;
+  line-height: 14px;
+}
+
+.note-status[data-status-size="large"] {
+  font-size: 14px;
+  line-height: 16px;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .note .note-action {
     transition: none;
   }
+}
+
+/* 标题栏四档。倍数是唯一的真值来源，其余尺寸都用 --chrome-* 从它派生；
+   属性选择器比 .note 更具体，所以写在文件末尾也照样盖得住上面的默认值。
+   步长相对默认档对称加减：小 −0.2，往上每档 +0.4。 */
+.note[data-chrome-size="small"] {
+  --chrome-scale: 0.8;
+}
+
+.note[data-chrome-size="large"] {
+  --chrome-scale: 1.4;
+}
+
+.note[data-chrome-size="xlarge"] {
+  --chrome-scale: 1.8;
 }

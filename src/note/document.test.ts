@@ -6,7 +6,6 @@ import {
   noteSchema,
   withPageContent,
   scaleFontSize,
-  DEFAULT_FONT,
   DEFAULT_FONT_SIZE,
   MAX_FONT_SIZE,
   MIN_FONT_SIZE,
@@ -26,11 +25,13 @@ function note(): Note {
     pattern: "plain",
     fontSize: DEFAULT_FONT_SIZE,
     toolbar: false,
-    font: DEFAULT_FONT,
     pinned: false,
     translucent: false,
     collapsed: false,
     spineSize: "max",
+    chromeSize: "normal",
+    statusSize: "small",
+    statusFaded: true,
     frame: { x: 0, y: 0, width: 300, height: 200 },
     expandedSize: null,
     maximized: false,
@@ -55,13 +56,41 @@ describe("标题栏高度兼容", () => {
   });
 });
 
-describe("字号与工具栏字段兼容", () => {
-  it("旧文档没有字体字段时用默认字体，认不出的字体名也照读", () => {
-    const { font: _font, ...legacy } = note();
-    expect(noteSchema.parse(legacy).font).toBe(DEFAULT_FONT);
-    // 认不出的字体名照样能打开：认不出来等于用户的便签打不开，那是更大的事故
-    expect(noteSchema.parse({ ...legacy, font: "futureFont" }).font).toBe("futureFont");
+describe("标题栏尺寸档位", () => {
+  it("旧文档落回默认档，非法值拒绝读取", () => {
+    const { chromeSize: _size, ...legacy } = note();
+    expect(noteSchema.parse(legacy).chromeSize).toBe("normal");
+    expect(noteSchema.safeParse({ ...legacy, chromeSize: "huge" }).success).toBe(false);
+    // 非默认档位必须能原样读回来：重开便签还得是用户选的那一档。
+    expect(noteSchema.parse({ ...legacy, chromeSize: "xlarge" }).chromeSize).toBe("xlarge");
   });
+});
+
+describe("字符统计档位", () => {
+  it("旧文档落回默认档和勾选半透明", () => {
+    const { statusSize: _size, statusFaded: _faded, ...legacy } = note();
+    const parsed = noteSchema.parse(legacy);
+    expect(parsed.statusSize).toBe("normal");
+    expect(parsed.statusFaded).toBe(true);
+    expect(noteSchema.safeParse({ ...legacy, statusSize: "huge" }).success).toBe(false);
+  });
+
+  it("用户取消勾选半透明后必须能原样读回来", () => {
+    // 默认是 true，false 只能靠显式写入：读不回来等于这个开关按了没用。
+    expect(noteSchema.parse({ ...note(), statusFaded: false }).statusFaded).toBe(false);
+    expect(noteSchema.parse({ ...note(), statusSize: "off" }).statusSize).toBe("off");
+  });
+});
+describe("旧文档的字体字段", () => {
+  it("磁盘上带 font 的旧文档照常打开，那个键被丢掉", () => {
+    // 字体功能删了，但用户的旧便签不能因此打不开：多出来的键读进来就丢掉。
+    const parsed = noteSchema.parse({ ...note(), font: "songti" });
+    expect(parsed).not.toHaveProperty("font");
+  });
+});
+
+
+describe("字号与工具栏字段兼容", () => {
 
   it("旧文档没有这两个字段时用默认值，读得回来也写得回去", () => {
     const { fontSize: _size, toolbar: _toolbar, maximized: _max, restoreFrame: _frame, ...legacy } =

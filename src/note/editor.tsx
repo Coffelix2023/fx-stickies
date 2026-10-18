@@ -5,7 +5,6 @@ import {
   useEditor,
   useEditorState,
 } from "@tiptap/react";
-import { useEffect, useRef, useState } from "react";
 import { Markdown } from "@tiptap/markdown";
 import StarterKit from "@tiptap/starter-kit";
 import { TableKit } from "@tiptap/extension-table";
@@ -33,8 +32,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import type { NoteContent } from "./document";
+import type { NoteContent, StatusSize } from "./document";
 import { NoteImage } from "./image";
+import { ScrollArrows, useScrollEdges } from "./ScrollStrip";
 import { PlainTextPaste } from "./plain-text-paste";
 /**
  * 块级命令执行前先确保编辑器有焦点。
@@ -297,52 +297,30 @@ export function NoteToolbar({ editor }: { editor: Editor | null }) {
       instance ? ITEMS.map((item) => item.active(instance)) : [],
   });
 
-  const bar = useRef<HTMLDivElement>(null);
-  const [more, setMore] = useState(false);
-
-  /**
-   * 便签窄到 200px 时工具栏装不下，靠横向滚动。滚动条是藏起来的，
-   * 所以右边挂一道渐隐当提示；滚到底自动消失。便签改宽窄会触发 resize，一并量一次。
-   */
-  useEffect(() => {
-    const element = bar.current;
-    if (!element) return;
-    const measure = () =>
-      setMore(element.scrollWidth - element.scrollLeft - element.clientWidth > 1);
-    measure();
-    element.addEventListener("scroll", measure);
-    window.addEventListener("resize", measure);
-    return () => {
-      element.removeEventListener("scroll", measure);
-      window.removeEventListener("resize", measure);
-    };
-  }, []);
+  const { track, edges, overflowing, nudge } = useScrollEdges();
 
   if (!editor) return null;
 
   return (
-    <div
-      ref={bar}
-      className="note-toolbar"
-      role="toolbar"
-      aria-label="Markdown 操作"
-      data-more={more}
-    >
-      {GROUPED_ITEMS.map((group, position) => (
-        <div className="note-toolbar-group" key={position}>
-          {group.map(({ item, index }) => (
-            <ToolbarButton
-              key={item.label}
-              item={item}
-              editor={editor}
-              active={activeItems?.[index] ?? false}
-            />
-          ))}
-          {position < GROUPED_ITEMS.length - 1 && (
-            <span className="note-toolbar-sep" role="separator" />
-          )}
-        </div>
-      ))}
+    <div className="note-toolbar" role="toolbar" aria-label="Markdown 操作">
+      <ScrollArrows edges={edges} overflowing={overflowing} onNudge={nudge} noun="工具项" />
+      <div className="note-toolbar-track" ref={track} data-more={edges.right}>
+        {GROUPED_ITEMS.map((group, position) => (
+          <div className="note-toolbar-group" key={position}>
+            {group.map(({ item, index }) => (
+              <ToolbarButton
+                key={item.label}
+                item={item}
+                editor={editor}
+                active={activeItems?.[index] ?? false}
+              />
+            ))}
+            {position < GROUPED_ITEMS.length - 1 && (
+              <span className="note-toolbar-sep" role="separator" />
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -372,7 +350,7 @@ function ToolbarButton({
         item.run(editor);
       }}
     >
-      <Icon className="size-[13px]" aria-hidden />
+      <Icon className="size-[var(--chrome-tool-icon)]" aria-hidden />
     </button>
   );
 }
@@ -394,7 +372,15 @@ export function NoteBody({ editor }: { editor: Editor | null }) {
  * 数的是当前渲染这一页的正文，不数换行和标记：换行是排版结构，标题和列表的
  * `*`、`#` 也不是用户看见的字。
  */
-export function NoteStatus({ editor }: { editor: Editor | null }) {
+export function NoteStatus({
+  editor,
+  size,
+  faded,
+}: {
+  editor: Editor | null;
+  size: StatusSize;
+  faded: boolean;
+}) {
   const counts = useEditorState({
     editor,
     selector: ({ editor: instance }) => {
@@ -407,13 +393,20 @@ export function NoteStatus({ editor }: { editor: Editor | null }) {
     },
   });
 
-  if (!editor) return null;
+  // 关掉就是整行不渲染：这一行占的高度一起还给正文。
+  if (!editor || size === "off") return null;
   const total = counts?.total ?? 0;
   const selected = counts?.selected ?? 0;
 
   return (
     // 每次敲字都会变的数字不该被读屏念出来，所以不做 live region。
-    <div className="note-status" aria-label="字符数">
+    // 字号档位和浓淡都挂在 data 属性上，像素与配色在 chrome.css。
+    <div
+      className="note-status"
+      aria-label="字符数"
+      data-status-size={size}
+      data-faded={faded}
+    >
       {selected > 0 ? `${selected} / ${total}` : total}
     </div>
   );

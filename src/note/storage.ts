@@ -34,21 +34,6 @@ export function hideNote(id: string): Promise<void> {
   return invoke("set_visible", { id, visible: false });
 }
 
-/**
- * 弹出这张便签的菜单窗口。`anchor` 是「更多操作」按钮在视口里的右下角，
- * 窗口层用它换算成屏幕坐标，并处理贴边翻转。
- */
-export function openMenuWindow(
-  id: string,
-  anchor: { right: number; bottom: number },
-): Promise<void> {
-  return invoke("open_menu_window", { id, anchor });
-}
-
-/** 收起菜单窗口。窗口不在时按成功处理。 */
-export function closeMenuWindow(id: string): Promise<void> {
-  return invoke("close_menu_window", { id });
-}
 
 /**
  * 删除一张便签：Rust 侧移除文档、关掉窗口并刷新托盘列表。不可恢复，

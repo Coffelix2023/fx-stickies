@@ -3,22 +3,41 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { JSONContent } from "@tiptap/core";
 
-import { DEFAULT_FONT, type Note } from "./document";
+import { type Note } from "./document";
 
 const invoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => invoke(...args),
 }));
 
-/** listen 的回调存下来，测试里手动触发一次菜单回传。 */
-const listeners = new Map<string, (event: { payload: unknown }) => void>();
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: (event: string, handler: (e: { payload: unknown }) => void) => {
-    listeners.set(event, handler);
-    return Promise.resolve(() => listeners.delete(event));
-  },
-  emitTo: vi.fn(),
-}));
+/**
+ * 原生菜单的假身：只把构造出来的项留在这儿，测试点某一项的 action。
+ * 与 chrome.test.tsx 里的那份是同一个形状，各自文件各 mock 一次。
+ */
+type MenuItemLike = {
+  text: string;
+  items?: MenuItemLike[];
+  action?: () => void;
+};
+let lastMenu: MenuItemLike[] = [];
+vi.mock("@tauri-apps/api/menu", () => {
+  const item = (opts: Partial<MenuItemLike>) => opts as MenuItemLike;
+  return {
+    MenuItem: { new: (opts: Partial<MenuItemLike>) => Promise.resolve(item(opts)) },
+    CheckMenuItem: { new: (opts: Partial<MenuItemLike>) => Promise.resolve(item(opts)) },
+    Submenu: {
+      new: (opts: Partial<MenuItemLike>) =>
+        Promise.resolve(item({ ...opts, items: opts.items ?? [] })),
+    },
+    PredefinedMenuItem: { new: (kind: string) => Promise.resolve({ text: kind }) },
+    Menu: {
+      new: (opts: { items: MenuItemLike[] }) => {
+        lastMenu = opts.items;
+        return Promise.resolve({ popup: () => Promise.resolve() });
+      },
+    },
+  };
+});
 
 
 /**
@@ -49,9 +68,15 @@ vi.mock("./editor", () => ({
 
 const { NoteWindow } = await import("./NoteWindow");
 
-/** 模拟菜单窗口回传一个动作。消息自带归属，默认发给 n1。 */
-function sendMenuAction(action: unknown, id = "n1") {
-  listeners.get("note-menu-action")?.({ payload: { id, action } });
+/** 打开原生菜单并点其中一项：菜单没有 DOM，只能这样触发动作。 */
+async function pickMenuItem(text: string) {
+  fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+  await waitFor(() => expect(lastMenu.length).toBeGreaterThan(0));
+  const flat = (items: MenuItemLike[]): MenuItemLike[] =>
+    items.flatMap((entry) => [entry, ...(entry.items ? flat(entry.items) : [])]);
+  flat(lastMenu)
+    .find((entry) => entry.text === text)
+    ?.action?.();
 }
 
 const page = (text: string): JSONContent => ({
@@ -70,11 +95,13 @@ function note(activeTab = "p1"): Note {
     pattern: "plain",
     fontSize: 14,
     toolbar: false,
-    font: DEFAULT_FONT,
     pinned: false,
     translucent: false,
     collapsed: false,
     spineSize: "max",
+    chromeSize: "normal",
+    statusSize: "small",
+    statusFaded: true,
     frame: { x: 0, y: 0, width: 300, height: 200 },
     expandedSize: null,
     maximized: false,
@@ -106,7 +133,7 @@ async function clickPin() {
 afterEach(() => {
   cleanup();
   invoke.mockReset();
-  listeners.clear();
+  lastMenu = [];
 });
 
 describe("便签只有一个正文区", () => {
@@ -179,17 +206,15 @@ describe("便签只有一个正文区", () => {
     });
   });
 
-  it("菜单回传的底色和底纹会落盘", async () => {
+  it("菜单换的底纹会落盘", async () => {
     renderWindow(note());
     await waitFor(() => expect(editor().value).toContain("第一页的正文"));
 
-    sendMenuAction({ kind: "appearance", patch: { paper: "cottonCandy" } });
-    sendMenuAction({ kind: "appearance", patch: { pattern: "grid" } });
+    await pickMenuItem("方格");
+
     await waitFor(() => {
       const calls = invoke.mock.calls;
-      const saved = calls[calls.length - 1];
-      expect(saved?.[1].note.paper).toBe("cottonCandy");
-      expect(saved?.[1].note.pattern).toBe("grid");
+      expect(calls[calls.length - 1]?.[1].note.pattern).toBe("grid");
     });
   });
 });
@@ -269,7 +294,7 @@ describe("隐藏便签", () => {
     fireEvent.change(editor(), {
       target: { value: JSON.stringify(page("关掉前写的")) },
     });
-    sendMenuAction({ kind: "hide" });
+    await pickMenuItem("隐藏便签");
 
     await waitFor(() => {
       const call = invoke.mock.calls.find(
@@ -300,7 +325,7 @@ describe("隐藏便签", () => {
     fireEvent.change(editor(), {
       target: { value: JSON.stringify(page("关不掉的字")) },
     });
-    sendMenuAction({ kind: "hide" });
+    await pickMenuItem("隐藏便签");
 
     expect((await screen.findByRole("alert")).textContent).toContain("磁盘只读");
     expect(

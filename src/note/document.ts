@@ -13,6 +13,17 @@ export const PAPER = [
   "periwinkle",
   "porcelain",
   "alabasterGrey",
+  // 第二组：Enchanted Forest Hues（= stickies-color.md 的 style-3），排在旧组右侧。
+  "charcoalBlue",
+  "pineBlue",
+  "verdigris",
+  "mutedOlive",
+  "drySage",
+  "tuscanSun",
+  "sunlitClay",
+  "sandyBrown",
+  "coralGlow",
+  "burntPeach",
 ] as const;
 export type Paper = (typeof PAPER)[number];
 
@@ -27,6 +38,16 @@ export const PAPER_LABELS: Record<Paper, string> = {
   periwinkle: "长春",
   porcelain: "瓷白",
   alabasterGrey: "雪花灰",
+  charcoalBlue: "炭蓝",
+  pineBlue: "松蓝",
+  verdigris: "铜绿",
+  mutedOlive: "灰橄榄",
+  drySage: "沙绿",
+  tuscanSun: "暖阳",
+  sunlitClay: "晒陶",
+  sandyBrown: "沙棕",
+  coralGlow: "珊瑚",
+  burntPeach: "焦桃",
 };
 /** 底纹，取值与 Rust 端 `note::Pattern` 一致。 */
 export const PATTERN = ["plain", "dots", "grid"] as const;
@@ -63,33 +84,11 @@ export const PLACEMENT_LABELS: Record<Placement, string> = {
   bottomCenter: "靠底边",
   bottomRight: "右下角",
 };
-/**
- * 可选正文字体。三种类型各占几款：两款无衬线、一款衬线、一款圆体、一款等宽。
- *
- * `font-maple-mono-cn` 由用户自己安装（没有 npm 包），所以只写字体名并兜底到系统等宽：
- * 装了就是它，没装也不会掉到别的字体上。
- */
-export const FONTS = [
-  { id: "system", label: "系统", stack: '-apple-system, "PingFang SC", "Helvetica Neue", sans-serif' },
-  { id: "geist", label: "Geist", stack: '"Geist Variable", -apple-system, sans-serif' },
-  { id: "songti", label: "宋体", stack: '"Songti SC", "STSong", Georgia, serif' },
-  { id: "yuanti", label: "圆体", stack: '"Yuanti SC", "YouYuan", "Songti SC", sans-serif' },
-  {
-    id: "maple",
-    label: "Maple",
-    stack: '"Maple Mono NF CN", "Maple Mono CN", ui-monospace, SFMono-Regular, Menlo, monospace',
-  },
-] as const;
-
-export type Font = (typeof FONTS)[number]["id"];
-
-/** 默认字体，取值与 Rust 端 `note::DEFAULT_FONT` 一致。 */
-export const DEFAULT_FONT: Font = "system";
 
 /** 正文字号的默认值与缩放上下限，与 Rust 端 `note::DEFAULT_FONT_SIZE` 等常量一致。 */
 export const DEFAULT_FONT_SIZE = 14;
-export const MIN_FONT_SIZE = 10;
-export const MAX_FONT_SIZE = 28;
+export const MIN_FONT_SIZE = 8;
+export const MAX_FONT_SIZE = 100;
 
 /**
  * 缩放后的字号。`step` 为 0 时回默认字号，正负各是缩放一级。
@@ -104,6 +103,44 @@ export function scaleFontSize(size: number, step: number): number {
 
 /** 标题栏高度档位。界面已经固定成 20px，这里只为旧文档保留字段。 */
 const SPINE_SIZES = ["min", "normal", "max"] as const;
+
+/**
+ * 脊条、工具栏、色块行这一组控件的尺寸档位。比例写在 chrome.css，
+ * 这里只管档位本身：具体像素是样式的活，文档只记用户选了哪一档。
+ */
+export const CHROME_SIZES = ["small", "normal", "large", "xlarge"] as const;
+export type ChromeSize = (typeof CHROME_SIZES)[number];
+
+export const CHROME_SIZE_LABELS: Record<ChromeSize, string> = {
+  small: "小",
+  normal: "默认",
+  large: "大",
+  xlarge: "超大",
+};
+
+/**
+ * 右下角字符统计的字号档位。`off` 直接把整行拿掉，正文因此多出这一行的高度。
+ * 具体像素在 chrome.css，这里同样只存用户选了哪一档。
+ */
+export const STATUS_SIZES = ["off", "small", "normal", "large"] as const;
+export type StatusSize = (typeof STATUS_SIZES)[number];
+
+export const STATUS_SIZE_LABELS: Record<StatusSize, string> = {
+  off: "off",
+  small: "小",
+  normal: "默认",
+  large: "大",
+};
+
+/** 默认档是 12px；更早的便签没有这个字段，读进来也落到这一档。 */
+export const DEFAULT_STATUS_SIZE: StatusSize = "normal";
+
+/**
+ * 字符统计是否用更淡的一档颜色。默认勾选：它是常驻的辅助信息，
+ * 不该和正文抢注意力。关掉就用正文同浓度的 --note-muted。
+ */
+export const DEFAULT_STATUS_FADED = true;
+export const DEFAULT_CHROME_SIZE: ChromeSize = "normal";
 
 const rectSchema = z.object({
   x: z.number(),
@@ -138,15 +175,16 @@ export const noteSchema = z.object({
   fontSize: z.number().default(DEFAULT_FONT_SIZE),
   /** 是否显示 Markdown 工具栏。旧文档没有这个字段，按不显示处理。 */
   toolbar: z.boolean().default(false),
-  /**
-   * 正文字体。存字符串而不是枚举：认不出的字体名照样能打开便签，
-   * 认不出来等于用户的便签打不开，那是更大的事故。
-   */
-  font: z.string().default(DEFAULT_FONT),
   pinned: z.boolean(),
   translucent: z.boolean(),
   collapsed: z.boolean(),
   spineSize: z.enum(SPINE_SIZES).default("min"),
+  /** 标题栏一组控件的尺寸档位。旧文档没有这个字段，落回默认档。 */
+  chromeSize: z.enum(CHROME_SIZES).default(DEFAULT_CHROME_SIZE),
+  /** 右下角字符统计的字号档位。旧文档没有这个字段，落回默认档。 */
+  statusSize: z.enum(STATUS_SIZES).default(DEFAULT_STATUS_SIZE),
+  /** 字符统计是否用更淡的一档颜色。旧文档没有这个字段，按勾选处理。 */
+  statusFaded: z.boolean().default(DEFAULT_STATUS_FADED),
   frame: rectSchema,
   expandedSize: sizeSchema.nullable(),
   /** 是否处于放大态。窗口层负责改，前端只渲染状态不渲染它。 */

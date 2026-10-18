@@ -148,9 +148,11 @@ body {
   height: auto;
 }
 
-/* 底色板：前八个取自 docs/color/Soft Pastel Dreams.png（色卡印的 hex，等同
-   stickies-color.md 的 style-2），末尾两个是补的中性色 —— 色卡里没有灰，也没有近白。
-   菜单里的色块直接用 --paper-*，因此这里只定义一次。 */
+/* 底色板分两组，各十枚，都取自 docs/color/ 下的色卡：
+   第一组 = Soft Pastel Dreams（= stickies-color.md 的 style-2），
+   其中 porcelain、alabasterGrey 是补的中性色 —— 色卡里没有灰，也没有近白；
+   第二组 = Enchanted Forest Hues（style-3），抽屉里排在第一组右侧。
+   抽屉里的色块直接用 --paper-*，因此这里只定义一次。 */
 :root {
   --paper-cottonCandy: #ff9aa2;
   --paper-powderBlush: #feb7b1;
@@ -163,76 +165,106 @@ body {
   /* 补的两个中性色 */
   --paper-porcelain: #faf9f7;
   --paper-alabasterGrey: #e7e7e4;
-}
-
-/* 正文字体。取值与 document.ts 的 FONTS 一致；没命中的 id 落回 :root 那档系统无衬线。
-   Maple Mono CN 由用户自己安装（没有 npm 包），所以只声明字体名并兜底系统等宽。 */
-.note[data-font="system"] {
-  --note-font: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
-}
-.note[data-font="geist"] {
-  --note-font: "Geist Variable", -apple-system, sans-serif;
-}
-.note[data-font="songti"] {
-  --note-font: "Songti SC", "STSong", Georgia, serif;
-}
-.note[data-font="yuanti"] {
-  --note-font: "Yuanti SC", "YouYuan", "Songti SC", sans-serif;
-}
-.note[data-font="maple"] {
-  --note-font: "Maple Mono NF CN", "Maple Mono CN", ui-monospace, SFMono-Regular, Menlo,
-    monospace;
+  /* 第二组：Enchanted Forest Hues（= stickies-color.md 的 style-3） */
+  --paper-charcoalBlue: #264653;
+  --paper-pineBlue: #287271;
+  --paper-verdigris: #2a9d8f;
+  --paper-mutedOlive: #8ab17d;
+  --paper-drySage: #babb74;
+  --paper-tuscanSun: #e9c46a;
+  --paper-sunlitClay: #efb366;
+  --paper-sandyBrown: #f4a261;
+  --paper-coralGlow: #ee8959;
+  --paper-burntPeach: #e76f51;
 }
 
 /* 便签底色。默认值给灰档。 */
 .note {
   --note-paper: var(--paper-alabasterGrey);
+  /* 脊条色由纸色压深一档得到：色卡只给了纸色，没有配套的深色档。
+     80% 纸 + 20% #3b332e 与上一版手挑的 300 档深浅相当。 */
+  --note-spine: color-mix(in srgb, var(--note-paper) 80%, #3b332e);
   background: var(--note-paper);
   color: var(--note-ink);
 }
 
-/* 脊条色由纸色压深一档得到：色卡只给了纸色，没有配套的深色档。
-   80% 纸 + 20% #3b332e 与上一版手挑的 300 档深浅相当。 */
-:is(.note, .note-menu) {
-  --note-spine: color-mix(in srgb, var(--note-paper) 80%, #3b332e);
-}
-
-:is(.note, .note-menu)[data-paper="cottonCandy"] {
+.note[data-paper="cottonCandy"] {
   --note-paper: var(--paper-cottonCandy);
 }
-:is(.note, .note-menu)[data-paper="powderBlush"] {
+.note[data-paper="powderBlush"] {
   --note-paper: var(--paper-powderBlush);
 }
-:is(.note, .note-menu)[data-paper="peachFuzz"] {
+.note[data-paper="peachFuzz"] {
   --note-paper: var(--paper-peachFuzz);
 }
-:is(.note, .note-menu)[data-paper="lightApricot"] {
+.note[data-paper="lightApricot"] {
   --note-paper: var(--paper-lightApricot);
 }
-:is(.note, .note-menu)[data-paper="frostedMint"] {
+.note[data-paper="frostedMint"] {
   --note-paper: var(--paper-frostedMint);
 }
-:is(.note, .note-menu)[data-paper="pearlAqua"] {
+.note[data-paper="pearlAqua"] {
   --note-paper: var(--paper-pearlAqua);
 }
-:is(.note, .note-menu)[data-paper="paleSky"] {
+.note[data-paper="paleSky"] {
   --note-paper: var(--paper-paleSky);
 }
-:is(.note, .note-menu)[data-paper="periwinkle"] {
+.note[data-paper="periwinkle"] {
   --note-paper: var(--paper-periwinkle);
 }
-:is(.note, .note-menu)[data-paper="porcelain"] {
+.note[data-paper="porcelain"] {
   --note-paper: var(--paper-porcelain);
 }
-:is(.note, .note-menu)[data-paper="alabasterGrey"] {
+.note[data-paper="alabasterGrey"] {
   --note-paper: var(--paper-alabasterGrey);
 }
 
+/* 第二组色板。深色纸上的正文要换成浅色：#1c1915 落在炭蓝/松蓝上几乎读不出来。 */
+/* 深色纸上的激活态文字要跟着正文翻成浅色：--note-spine 在这两档上本来就比
+   纸色深，再拿纸色当字就只有 1.05:1，脊条上的置顶/底色按钮等于隐形。 */
+.note[data-paper="charcoalBlue"] {
+  --note-paper: var(--paper-charcoalBlue);
+  --note-ink: #f2f0ec;
+  --note-line: rgb(242 240 236 / 22%);
+  --note-grid-line: rgb(242 240 236 / 12%);
+  --note-on-spine: var(--note-ink);
+}
+.note[data-paper="pineBlue"] {
+  --note-paper: var(--paper-pineBlue);
+  --note-ink: #f2f0ec;
+  --note-line: rgb(242 240 236 / 22%);
+  --note-grid-line: rgb(242 240 236 / 12%);
+  --note-on-spine: var(--note-ink);
+}
+.note[data-paper="verdigris"] {
+  --note-paper: var(--paper-verdigris);
+}
+.note[data-paper="mutedOlive"] {
+  --note-paper: var(--paper-mutedOlive);
+}
+.note[data-paper="drySage"] {
+  --note-paper: var(--paper-drySage);
+}
+.note[data-paper="tuscanSun"] {
+  --note-paper: var(--paper-tuscanSun);
+}
+.note[data-paper="sunlitClay"] {
+  --note-paper: var(--paper-sunlitClay);
+}
+.note[data-paper="sandyBrown"] {
+  --note-paper: var(--paper-sandyBrown);
+}
+.note[data-paper="coralGlow"] {
+  --note-paper: var(--paper-coralGlow);
+}
+.note[data-paper="burntPeach"] {
+  --note-paper: var(--paper-burntPeach);
+}
 /* 底纹 */
 .note[data-pattern="dots"] .note-body {
   background-image: radial-gradient(
     circle,
-    rgb(28 25 21 / 20%) 1px,
+    var(--note-grid-line) 1px,
     transparent 1.15px
   );
   background-size: 16px 16px;

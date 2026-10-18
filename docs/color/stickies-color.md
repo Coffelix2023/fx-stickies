@@ -25,3 +25,18 @@
 --pale-sky: #b7dbebff;
 --periwinkle: #c7ceeaff;
 ```
+
+## style-3
+
+```css
+--charcoal-blue: #264653ff;
+--pine-blue: #287271ff;
+--verdigris: #2a9d8fff;
+--muted-olive: #8ab17dff;
+--dry-sage: #babb74ff;
+--tuscan-sun: #e9c46aff;
+--sunlit-clay: #efb366ff;
+--sandy-brown: #f4a261ff;
+--coral-glow: #ee8959ff;
+--burnt-peach: #e76f51ff;
+```
