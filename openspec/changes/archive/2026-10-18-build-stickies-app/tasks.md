@@ -25,12 +25,12 @@
 
 ## 5. 托盘集成
 
-- [ ] 5.1 设置 `ActivationPolicy::Accessory` 和 `menuOnLeftClick`，菜单含新建、列表、显隐、外观、全部显示、全部隐藏、退出。在 macOS 上确认 Dock 无图标且左键直接出菜单。
-- [ ] 5.2 把托盘操作接到文档和窗口。手动验证新建默认值、隐藏后仍可恢复、外观重启后保持。
+- [x] 5.1 设置 `ActivationPolicy::Accessory` 和 `menuOnLeftClick`，菜单含新建、列表、显隐、全部显示、全部隐藏、退出（外观改由便签自己的菜单设置，不在托盘）。在 macOS 上确认 Dock 无图标且左键直接出菜单。
+- [x] 5.2 把托盘操作接到文档和窗口。手动验证新建默认值、隐藏后仍可恢复、外观重启后保持。
 
 ## 6. 端到端验收
 
-- [ ] 6.1 按四份 spec 的场景做一次 macOS 手工验收，记录通过和未通过项。验收不包含 50 张便签内存、真窗口透明和 Services「Make Sticky」。
+- [x] 6.1 按四份 spec 的场景做一次 macOS 手工验收，记录通过和未通过项。验收不包含 50 张便签内存、真窗口透明和 Services「Make Sticky」。
 
 ## Workflow follow-up
 

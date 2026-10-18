@@ -1,121 +1,27 @@
-```tailwind.css
---color-alabaster-grey-50: oklch(96.39% 0.001 106.42);
---color-alabaster-grey-100: oklch(92.71% 0.004 106.48);
---color-alabaster-grey-200: oklch(85.28% 0.008 106.57);
---color-alabaster-grey-300: oklch(77.42% 0.010 106.63);
---color-alabaster-grey-400: oklch(69.63% 0.014 106.77);
---color-alabaster-grey-500: oklch(61.62% 0.019 106.95);
---color-alabaster-grey-600: oklch(52.47% 0.015 106.92);
---color-alabaster-grey-700: oklch(42.90% 0.011 106.87);
---color-alabaster-grey-800: oklch(33.08% 0.010 106.95);
---color-alabaster-grey-900: oklch(22.10% 0.006 106.86);
---color-alabaster-grey-950: oklch(18.59% 0.004 106.78);
+# 色块
 
---color-dust-grey-50: oklch(96.39% 0.001 106.42);
---color-dust-grey-100: oklch(92.47% 0.001 106.43);
---color-dust-grey-200: oklch(85.03% 0.005 106.52);
---color-dust-grey-300: oklch(77.16% 0.007 106.56);
---color-dust-grey-400: oklch(69.10% 0.009 106.62);
---color-dust-grey-500: oklch(60.79% 0.010 106.70);
---color-dust-grey-600: oklch(51.89% 0.009 106.72);
---color-dust-grey-700: oklch(42.59% 0.008 106.74);
---color-dust-grey-800: oklch(32.76% 0.007 106.77);
---color-dust-grey-900: oklch(21.74% 0.002 106.56);
---color-dust-grey-950: oklch(18.18% 0.002 106.60);
+## style-1
 
---color-powder-petal-50: oklch(96.20% 0.008 48.65);
---color-powder-petal-100: oklch(92.29% 0.015 50.80);
---color-powder-petal-200: oklch(84.47% 0.030 50.56);
---color-powder-petal-300: oklch(76.83% 0.048 53);
---color-powder-petal-400: oklch(68.85% 0.065 51.89);
---color-powder-petal-500: oklch(60.85% 0.083 50.80);
---color-powder-petal-600: oklch(51.92% 0.070 51.23);
---color-powder-petal-700: oklch(42.59% 0.055 51.94);
---color-powder-petal-800: oklch(32.38% 0.038 49.54);
---color-powder-petal-900: oklch(21.67% 0.021 49.82);
---color-powder-petal-950: oklch(18.21% 0.016 47.84);
+```css
+--powder-blush: #ffadadff;
+--apricot-cream: #ffd6a5ff;
+--cream: #fdffb6ff;
+--tea-green: #caffbfff;
+--electric-aqua: #9bf6ffff;
+--baby-blue-ice: #a0c4ffff;
+--periwinkle: #bdb2ffff;
+--mauve: #ffc6ffff;
+```
 
---color-powder-petal-50: oklch(96.46% 0.016 58.64);
---color-powder-petal-100: oklch(92.72% 0.033 57.12);
---color-powder-petal-200: oklch(85.77% 0.068 57.94);
---color-powder-petal-300: oklch(78.88% 0.103 56.39);
---color-powder-petal-400: oklch(72.39% 0.137 54.12);
---color-powder-petal-500: oklch(66.36% 0.164 49.83);
---color-powder-petal-600: oklch(56.54% 0.138 50.25);
---color-powder-petal-700: oklch(46.12% 0.110 51.02);
---color-powder-petal-800: oklch(35.09% 0.079 52.42);
---color-powder-petal-900: oklch(22.91% 0.046 53.79);
---color-powder-petal-950: oklch(19.09% 0.034 60.53);
+## style-2
 
---color-pearl-beige-50: oklch(97.68% 0.021 88.72);
---color-pearl-beige-100: oklch(95.31% 0.041 90.25);
---color-pearl-beige-200: oklch(90.63% 0.081 88.72);
---color-pearl-beige-300: oklch(86.28% 0.116 88.65);
---color-pearl-beige-400: oklch(82.05% 0.144 86.38);
---color-pearl-beige-500: oklch(78.18% 0.157 83.08);
---color-pearl-beige-600: oklch(66.25% 0.132 82.93);
---color-pearl-beige-700: oklch(53.85% 0.106 84.19);
---color-pearl-beige-800: oklch(40.58% 0.079 84.29);
---color-pearl-beige-900: oklch(26.23% 0.047 88.39);
---color-pearl-beige-950: oklch(21.33% 0.038 89.37);
-
---color-frozen-water-50: oklch(96.69% 0.009 188.11);
---color-frozen-water-100: oklch(93.54% 0.019 180.26);
---color-frozen-water-200: oklch(87.09% 0.037 181.57);
---color-frozen-water-300: oklch(80.64% 0.055 180.07);
---color-frozen-water-400: oklch(74.23% 0.073 178.66);
---color-frozen-water-500: oklch(67.93% 0.088 177.02);
---color-frozen-water-600: oklch(57.76% 0.074 177.35);
---color-frozen-water-700: oklch(47.12% 0.058 177.88);
---color-frozen-water-800: oklch(35.84% 0.042 178.90);
---color-frozen-water-900: oklch(23.55% 0.024 177.43);
---color-frozen-water-950: oklch(19.65% 0.018 176.83);
-
---color-pale-sky-50: oklch(95.94% 0.013 240.95);
---color-pale-sky-100: oklch(91.95% 0.026 242.76);
---color-pale-sky-200: oklch(83.90% 0.054 243.25);
---color-pale-sky-300: oklch(75.91% 0.081 243.98);
---color-pale-sky-400: oklch(68.08% 0.108 245.18);
---color-pale-sky-500: oklch(60.58% 0.134 247.37);
---color-pale-sky-600: oklch(51.60% 0.112 247.18);
---color-pale-sky-700: oklch(42.21% 0.088 246.90);
---color-pale-sky-800: oklch(32.27% 0.064 246.41);
---color-pale-sky-900: oklch(21.52% 0.036 245.41);
---color-pale-sky-950: oklch(18.09% 0.027 244.61);
-
---color-thistle-50: oklch(94.88% 0.020 305.26);
---color-thistle-100: oklch(89.92% 0.038 304.06);
---color-thistle-200: oklch(79.49% 0.081 302.54);
---color-thistle-300: oklch(69.28% 0.123 301.57);
---color-thistle-400: oklch(59.22% 0.165 299.85);
---color-thistle-500: oklch(49.77% 0.201 296.79);
---color-thistle-600: oklch(42.52% 0.168 296.93);
---color-thistle-700: oklch(34.96% 0.134 297.13);
---color-thistle-800: oklch(26.97% 0.098 297.47);
---color-thistle-900: oklch(18.65% 0.054 300.02);
---color-thistle-950: oklch(15.78% 0.040 301.56);
-
---color-pastel-petal-50: oklch(95.23% 0.021 342.53);
---color-pastel-petal-100: oklch(90.57% 0.043 343.99);
---color-pastel-petal-200: oklch(81.45% 0.087 345.24);
---color-pastel-petal-300: oklch(72.69% 0.134 347.02);
---color-pastel-petal-400: oklch(64.81% 0.177 349.22);
---color-pastel-petal-500: oklch(58.42% 0.210 352.14);
---color-pastel-petal-600: oklch(49.61% 0.175 352.20);
---color-pastel-petal-700: oklch(40.54% 0.141 351.94);
---color-pastel-petal-800: oklch(30.86% 0.102 351.13);
---color-pastel-petal-900: oklch(20.51% 0.060 349.88);
---color-pastel-petal-950: oklch(17.20% 0.043 348.37);
-
---color-cotton-rose-50: oklch(94.81% 0.023 14.26);
---color-cotton-rose-100: oklch(89.64% 0.046 13.08);
---color-cotton-rose-200: oklch(79.72% 0.098 15.50);
---color-cotton-rose-300: oklch(70.77% 0.152 17.72);
---color-cotton-rose-400: oklch(63.57% 0.202 21.56);
---color-cotton-rose-500: oklch(59.05% 0.231 26.19);
---color-cotton-rose-600: oklch(50.11% 0.195 25.98);
---color-cotton-rose-700: oklch(40.61% 0.155 25.41);
---color-cotton-rose-800: oklch(30.73% 0.113 24.67);
---color-cotton-rose-900: oklch(20.02% 0.067 21.04);
---color-cotton-rose-950: oklch(16.31% 0.053 19.61);
+```css
+--cotton-candy: #ff9aa2ff;
+--powder-blush: #feb7b1ff;
+--peach-fuzz: #ffdac0ff;
+--light-apricot: #ffecc4ff;
+--frosted-mint: #e2f0ccff;
+--pearl-aqua: #b5ead6ff;
+--pale-sky: #b7dbebff;
+--periwinkle: #c7ceeaff;
 ```

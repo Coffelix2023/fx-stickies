@@ -174,12 +174,12 @@ describe("便签只有一个正文区", () => {
     renderWindow(note());
     await waitFor(() => expect(editor().value).toContain("第一页的正文"));
 
-    sendMenuAction({ kind: "appearance", patch: { paper: "cottonRose" } });
+    sendMenuAction({ kind: "appearance", patch: { paper: "cottonCandy" } });
     sendMenuAction({ kind: "appearance", patch: { pattern: "grid" } });
     await waitFor(() => {
       const calls = invoke.mock.calls;
       const saved = calls[calls.length - 1];
-      expect(saved?.[1].note.paper).toBe("cottonRose");
+      expect(saved?.[1].note.paper).toBe("cottonCandy");
       expect(saved?.[1].note.pattern).toBe("grid");
     });
   });

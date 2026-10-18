@@ -1,18 +1,18 @@
 /* 控件从纸色派生，十种底色共用同一套层级。
-   这几个变量放在根上：更多操作浮层挂在 body 上，继承不到 .note 的定义。 */
+   派生变量必须和 --note-paper 声明在同一个元素上：自定义属性的 var() 在声明处替换，
+   写在 :root 上时那里还没有 --note-paper，--note-muted / --note-hover 会整条失效。 */
 :root {
   --note-ink: #1c1915;
   --note-line: rgb(28 25 21 / 16%);
   /* 方格底纹专用：整页铺满，按 --note-line 的一半浓度。 */
   --note-grid-line: rgb(28 25 21 / 8%);
-  --note-muted: color-mix(in srgb, var(--note-ink) 68%, var(--note-paper));
-  --note-hover: color-mix(in srgb, var(--note-paper) 60%, white);
 }
 .note {
+  --note-muted: color-mix(in srgb, var(--note-ink) 68%, var(--note-paper));
+  --note-hover: color-mix(in srgb, var(--note-paper) 60%, white);
   border: 1px solid color-mix(in srgb, var(--note-spine) 65%, var(--note-paper));
   caret-color: var(--note-ink);
 }
-
 .note ::selection {
   background: var(--note-spine);
   color: var(--note-ink);
@@ -49,7 +49,8 @@
 
 
 .note-action[data-pinned="true"] {
-  background: var(--note-ink);
+  /* 激活色跟随便签底色：--note-spine 是同一色系的深色档（App.css 里纸色取 100 档、脊条取 300 档）。 */
+  background: var(--note-spine);
   color: var(--note-paper);
 }
 

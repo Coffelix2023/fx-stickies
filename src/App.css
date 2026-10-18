@@ -148,79 +148,66 @@ body {
   height: auto;
 }
 
-/* 底色板：十组色板各取 100 档作纸色、300 档作脊条，来源 docs/color/stickies-color.md。
+/* 底色板：前八个取自 docs/color/Soft Pastel Dreams.png（色卡印的 hex，等同
+   stickies-color.md 的 style-2），末尾两个是补的中性色 —— 色卡里没有灰，也没有近白。
    菜单里的色块直接用 --paper-*，因此这里只定义一次。 */
 :root {
-  --paper-alabasterGrey: oklch(92.71% 0.004 106.48);
-  --spine-alabasterGrey: oklch(77.42% 0.01 106.63);
-  --paper-dustGrey: oklch(92.47% 0.001 106.43);
-  --spine-dustGrey: oklch(77.16% 0.007 106.56);
-  --paper-blush: oklch(92.29% 0.015 50.8);
-  --spine-blush: oklch(76.83% 0.048 53);
-  --paper-apricot: oklch(92.72% 0.033 57.12);
-  --spine-apricot: oklch(78.88% 0.103 56.39);
-  --paper-pearlBeige: oklch(95.31% 0.041 90.25);
-  --spine-pearlBeige: oklch(86.28% 0.116 88.65);
-  --paper-frozenWater: oklch(93.54% 0.019 180.26);
-  --spine-frozenWater: oklch(80.64% 0.055 180.07);
-  --paper-paleSky: oklch(91.95% 0.026 242.76);
-  --spine-paleSky: oklch(75.91% 0.081 243.98);
-  --paper-thistle: oklch(89.92% 0.038 304.06);
-  --spine-thistle: oklch(69.28% 0.123 301.57);
-  --paper-pastelPetal: oklch(90.57% 0.043 343.99);
-  --spine-pastelPetal: oklch(72.69% 0.134 347.02);
-  --paper-cottonRose: oklch(89.64% 0.046 13.08);
-  --spine-cottonRose: oklch(70.77% 0.152 17.72);
+  --paper-cottonCandy: #ff9aa2;
+  --paper-powderBlush: #feb7b1;
+  --paper-peachFuzz: #ffdac0;
+  --paper-lightApricot: #ffecc4;
+  --paper-frostedMint: #e2f0cc;
+  --paper-pearlAqua: #b5ead6;
+  --paper-paleSky: #b7dbeb;
+  --paper-periwinkle: #c7ceea;
+  /* 补的两个中性色 */
+  --paper-porcelain: #faf9f7;
+  --paper-alabasterGrey: #e7e7e4;
 }
 
-/* 便签底色与脊条颜色。默认值给第一档。 */
+/* 便签底色。默认值给灰档。 */
 .note {
   --note-paper: var(--paper-alabasterGrey);
-  --note-spine: var(--spine-alabasterGrey);
   background: var(--note-paper);
   color: var(--note-ink);
 }
-:is(.note, .note-menu)[data-paper="alabasterGrey"] {
-  --note-paper: var(--paper-alabasterGrey);
-  --note-spine: var(--spine-alabasterGrey);
+
+/* 脊条色由纸色压深一档得到：色卡只给了纸色，没有配套的深色档。
+   80% 纸 + 20% #3b332e 与上一版手挑的 300 档深浅相当。 */
+:is(.note, .note-menu) {
+  --note-spine: color-mix(in srgb, var(--note-paper) 80%, #3b332e);
 }
-:is(.note, .note-menu)[data-paper="dustGrey"] {
-  --note-paper: var(--paper-dustGrey);
-  --note-spine: var(--spine-dustGrey);
+
+:is(.note, .note-menu)[data-paper="cottonCandy"] {
+  --note-paper: var(--paper-cottonCandy);
 }
-:is(.note, .note-menu)[data-paper="blush"] {
-  --note-paper: var(--paper-blush);
-  --note-spine: var(--spine-blush);
+:is(.note, .note-menu)[data-paper="powderBlush"] {
+  --note-paper: var(--paper-powderBlush);
 }
-:is(.note, .note-menu)[data-paper="apricot"] {
-  --note-paper: var(--paper-apricot);
-  --note-spine: var(--spine-apricot);
+:is(.note, .note-menu)[data-paper="peachFuzz"] {
+  --note-paper: var(--paper-peachFuzz);
 }
-:is(.note, .note-menu)[data-paper="pearlBeige"] {
-  --note-paper: var(--paper-pearlBeige);
-  --note-spine: var(--spine-pearlBeige);
+:is(.note, .note-menu)[data-paper="lightApricot"] {
+  --note-paper: var(--paper-lightApricot);
 }
-:is(.note, .note-menu)[data-paper="frozenWater"] {
-  --note-paper: var(--paper-frozenWater);
-  --note-spine: var(--spine-frozenWater);
+:is(.note, .note-menu)[data-paper="frostedMint"] {
+  --note-paper: var(--paper-frostedMint);
+}
+:is(.note, .note-menu)[data-paper="pearlAqua"] {
+  --note-paper: var(--paper-pearlAqua);
 }
 :is(.note, .note-menu)[data-paper="paleSky"] {
   --note-paper: var(--paper-paleSky);
-  --note-spine: var(--spine-paleSky);
 }
-:is(.note, .note-menu)[data-paper="thistle"] {
-  --note-paper: var(--paper-thistle);
-  --note-spine: var(--spine-thistle);
+:is(.note, .note-menu)[data-paper="periwinkle"] {
+  --note-paper: var(--paper-periwinkle);
 }
-:is(.note, .note-menu)[data-paper="pastelPetal"] {
-  --note-paper: var(--paper-pastelPetal);
-  --note-spine: var(--spine-pastelPetal);
+:is(.note, .note-menu)[data-paper="porcelain"] {
+  --note-paper: var(--paper-porcelain);
 }
-:is(.note, .note-menu)[data-paper="cottonRose"] {
-  --note-paper: var(--paper-cottonRose);
-  --note-spine: var(--spine-cottonRose);
+:is(.note, .note-menu)[data-paper="alabasterGrey"] {
+  --note-paper: var(--paper-alabasterGrey);
 }
-
 
 /* 底纹 */
 .note[data-pattern="dots"] .note-body {

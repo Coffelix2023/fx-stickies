@@ -39,10 +39,20 @@ export function NoteMenuWindow({ id }: { id: string }) {
 
   if (!note) return null;
 
-  /** 选完就收起菜单，动作交给便签窗口落地。消息里带上归属，接收方会复核。 */
+  /**
+   * 把动作发回便签窗口执行。外观类改动留在菜单里：用户要一项项点着对比效果，
+   * 收起就没法比了。对齐会挪动便签，菜单是贴着按钮的子窗口，跟着挪就废了；
+   * 隐藏和删除会离开这张便签，同样必须收起。消息里带上归属，接收方会复核。
+   */
   async function send(action: NoteMenuAction) {
     const message: NoteMenuEvent = { id, action };
     await emitTo(id, "note-menu-action", message);
+    if (action.kind === "appearance") {
+      // 菜单自己的选中态跟着走，否则高亮停在上一项。这里乐观更新：纸色和底纹
+      // 刚发给便签窗口，落盘结果不会和这里不一致；重读文档要多一次 IPC 且会闪。
+      setNote((current) => (current ? { ...current, ...action.patch } : current));
+      return;
+    }
     await closeMenuWindow(id);
   }
 
@@ -50,6 +60,7 @@ export function NoteMenuWindow({ id }: { id: string }) {
     <NoteMenuPanel
       note={note}
       onAppearanceChange={(patch) => void send({ kind: "appearance", patch })}
+      onAlign={(placement) => void send({ kind: "align", placement })}
       onHide={() => void send({ kind: "hide" })}
       onDelete={() => void send({ kind: "delete" })}
     />

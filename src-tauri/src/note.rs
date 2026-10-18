@@ -10,26 +10,31 @@ use serde::{Deserialize, Serialize};
 
 use crate::frame::{Rect, Size};
 
-/// 底色。取自 `docs/color/stickies-color.md` 的十组色板。
-/// 旧文档里的五个颜色是 serde alias，读进来自动落到最接近的新色上。
+/// 底色。前八个取自 `docs/color/Soft Pastel Dreams.png`（= `stickies-color.md` 的 style-2），
+/// `Porcelain` 和 `AlabasterGrey` 是补的中性色：色卡里没有近白也没有灰。
+/// 换色板前的旧颜色全部是 serde alias，读进来自动落到最接近的新色上，
+/// 磁盘上的文件不用重写，下次保存时自动写成新值。别删已有 alias：磁盘上还有
+/// 两代以前的文档（实测有一张 paper=mistBlue），认不出来就等于便签打不开。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Paper {
-    #[serde(alias = "ivory")]
-    AlabasterGrey,
-    DustGrey,
-    Blush,
-    Apricot,
-    #[serde(alias = "straw")]
-    PearlBeige,
-    #[serde(alias = "sage")]
-    FrozenWater,
-    #[serde(alias = "mistBlue")]
+    #[serde(alias = "pastelPetal", alias = "cottonRose", alias = "terracotta")]
+    CottonCandy,
+    #[serde(alias = "blush")]
+    PowderBlush,
+    #[serde(alias = "apricot")]
+    PeachFuzz,
+    #[serde(alias = "pearlBeige", alias = "straw")]
+    LightApricot,
+    FrostedMint,
+    PearlAqua,
+    #[serde(alias = "frozenWater", alias = "mistBlue", alias = "sage")]
     PaleSky,
-    Thistle,
-    PastelPetal,
-    #[serde(alias = "terracotta")]
-    CottonRose,
+    #[serde(alias = "thistle")]
+    Periwinkle,
+    Porcelain,
+    #[serde(alias = "dustGrey", alias = "ivory")]
+    AlabasterGrey,
 }
 
 /// 底纹。
@@ -479,7 +484,7 @@ mod tests {
             "n1".into(),
             Rect::new(5.0, 6.0, DEFAULT_WIDTH, DEFAULT_HEIGHT),
         );
-        note.paper = Paper::FrozenWater;
+        note.paper = Paper::PaleSky;
         note.pattern = Pattern::Grid;
         save(&dir, &note).unwrap();
 
@@ -507,13 +512,24 @@ mod tests {
 
     #[test]
     fn old_paper_names_still_open_and_land_on_the_nearest_new_colour() {
-        // 换色板前的五个颜色是 alias：认不出来就会拒绝打开，用户会以为便签丢了。
+        // 换色板前的旧颜色全是 alias：认不出来就会拒绝打开，用户会以为便签丢了。
+        // 覆盖三代旧名，别只测最近这一代。
         for (old, expected) in [
+            // 第一代
             ("ivory", Paper::AlabasterGrey),
             ("mistBlue", Paper::PaleSky),
-            ("sage", Paper::FrozenWater),
-            ("terracotta", Paper::CottonRose),
-            ("straw", Paper::PearlBeige),
+            ("sage", Paper::PaleSky),
+            ("terracotta", Paper::CottonCandy),
+            ("straw", Paper::LightApricot),
+            // 第二代（换到 Soft Pastel Dreams 之前那版）
+            ("dustGrey", Paper::AlabasterGrey),
+            ("blush", Paper::PowderBlush),
+            ("apricot", Paper::PeachFuzz),
+            ("pearlBeige", Paper::LightApricot),
+            ("frozenWater", Paper::PaleSky),
+            ("thistle", Paper::Periwinkle),
+            ("pastelPetal", Paper::CottonCandy),
+            ("cottonRose", Paper::CottonCandy),
         ] {
             let parsed: Paper =
                 serde_json::from_value(serde_json::Value::String(old.into())).unwrap();

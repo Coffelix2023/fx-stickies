@@ -3,30 +3,30 @@ import { z } from "zod";
 
 /** 底色，取值与 Rust 端 `note::Paper` 一致，色值见 App.css 的 --paper-*。 */
 export const PAPER = [
-  "alabasterGrey",
-  "dustGrey",
-  "blush",
-  "apricot",
-  "pearlBeige",
-  "frozenWater",
+  "cottonCandy",
+  "powderBlush",
+  "peachFuzz",
+  "lightApricot",
+  "frostedMint",
+  "pearlAqua",
   "paleSky",
-  "thistle",
-  "pastelPetal",
-  "cottonRose",
+  "periwinkle",
+  "porcelain",
+  "alabasterGrey",
 ] as const;
 export type Paper = (typeof PAPER)[number];
 
 export const PAPER_LABELS: Record<Paper, string> = {
-  alabasterGrey: "雪花灰",
-  dustGrey: "尘灰",
-  blush: "藕粉",
-  apricot: "杏橘",
-  pearlBeige: "珍珠米",
-  frozenWater: "霜蓝",
+  cottonCandy: "棉花糖",
+  powderBlush: "粉雾",
+  peachFuzz: "蜜桃",
+  lightApricot: "浅杏",
+  frostedMint: "薄荷",
+  pearlAqua: "珍珠青",
   paleSky: "天蓝",
-  thistle: "蓟紫",
-  pastelPetal: "樱粉",
-  cottonRose: "玫瑰",
+  periwinkle: "长春",
+  porcelain: "瓷白",
+  alabasterGrey: "雪花灰",
 };
 /** 底纹，取值与 Rust 端 `note::Pattern` 一致。 */
 export const PATTERN = ["plain", "dots", "grid"] as const;
@@ -36,6 +36,32 @@ export const PATTERN_LABELS: Record<Pattern, string> = {
   plain: "无",
   dots: "点阵",
   grid: "方格",
+};
+
+/** 屏幕对齐位置，取值与 Rust 端 `frame::Placement` 一致；顺序就是九宫格的行序。 */
+export const PLACEMENTS = [
+  "topLeft",
+  "topCenter",
+  "topRight",
+  "middleLeft",
+  "center",
+  "middleRight",
+  "bottomLeft",
+  "bottomCenter",
+  "bottomRight",
+] as const;
+export type Placement = (typeof PLACEMENTS)[number];
+
+export const PLACEMENT_LABELS: Record<Placement, string> = {
+  topLeft: "左上角",
+  topCenter: "靠顶边",
+  topRight: "右上角",
+  middleLeft: "靠左边",
+  center: "居中",
+  middleRight: "靠右边",
+  bottomLeft: "左下角",
+  bottomCenter: "靠底边",
+  bottomRight: "右下角",
 };
 /** 标题栏高度档位。界面已经固定成 20px，这里只为旧文档保留字段。 */
 const SPINE_SIZES = ["min", "normal", "max"] as const;

@@ -12,7 +12,8 @@ import {
   withWindowState,
 } from "./document";
 import {
-  getNote,
+  alignNote,
+getNote,
   hideNote,
   saveNote,
   setPinned,
@@ -74,6 +75,9 @@ export function NoteWindow({ id }: { id: string }) {
         const action = event.payload.action;
         if (action.kind === "appearance") {
           setNote((prev) => (prev ? { ...prev, ...action.patch } : prev));
+        } else if (action.kind === "align") {
+          // 对齐同样只动窗口，文档里的位置由 Rust 侧写好。
+          applyWindowChange(alignNote(id, action.placement));
         } else if (action.kind === "hide") {
           void hideWindow(current);
         } else {

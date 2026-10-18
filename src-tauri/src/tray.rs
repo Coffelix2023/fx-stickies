@@ -3,11 +3,9 @@
 //! 菜单本身不碰文档，动作都调 `lib.rs` 里的便签操作，
 //! 这样托盘和窗口走的是同一条数据路径。
 
-use std::sync::Mutex;
-
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Runtime};
 
 
 /// 托盘列表名。旧标题还在就用标题；否则用正文里第一行非空文字。
@@ -66,46 +64,13 @@ fn truncate_label(line: &str) -> String {
     label
 }
 
-/// 过滤只看菜单上的标签，不看文档 id。空串表示不过滤。
-pub fn label_matches(label: &str, query: &str) -> bool {
-    let query = query.trim();
-    query.is_empty() || label.to_lowercase().contains(&query.to_lowercase())
-}
-
-/// 菜单里展示的过滤词。空串不显示，避免标签上挂一个空括号。
-pub fn filter_caption(query: &str) -> String {
-    let query = query.trim();
-    if query.is_empty() {
-        "过滤标签".to_string()
-    } else {
-        format!("过滤标签：{query}")
-    }
-}
-
 pub const MENU_NEW: &str = "new";
 pub const MENU_LIST: &str = "note-list";
 pub const MENU_SHOW_ALL: &str = "show-all";
 pub const MENU_HIDE_ALL: &str = "hide-all";
-pub const MENU_FILTER: &str = "filter-labels";
 pub const MENU_QUIT: &str = "quit";
 pub const NOTE_PREFIX: &str = "note:";
 
-
-/// 便签列表当前的过滤词。菜单重建后还要留着，否则点一次就丢。
-#[derive(Default)]
-pub struct LabelFilter(pub Mutex<String>);
-
-impl LabelFilter {
-    pub fn get(&self) -> String {
-        self.0.lock().ok().map(|query| query.clone()).unwrap_or_default()
-    }
-
-    pub fn set(&self, query: &str) {
-        if let Ok(mut current) = self.0.lock() {
-            *current = query.trim().to_string();
-        }
-    }
-}
 
 
 
@@ -113,7 +78,6 @@ impl LabelFilter {
 pub fn build_menu<R: Runtime>(
     app: &AppHandle<R>,
     notes: &[crate::note::Note],
-    filter: &str,
 ) -> tauri::Result<Menu<R>> {
     let menu = Menu::new(app)?;
     menu.append(&MenuItem::with_id(
@@ -124,9 +88,8 @@ pub fn build_menu<R: Runtime>(
         None::<&str>,
     )?)?;
     menu.append(&PredefinedMenuItem::separator(app)?)?;
-    menu.append(&PredefinedMenuItem::separator(app)?)?;
 
-    // 便签列表：勾选表示当前可见。全部显示/隐藏和过滤都是同一类操作。
+    // 便签列表：勾选表示当前可见。
     let list = Submenu::with_id(app, MENU_LIST, "便签列表", true)?;
     list.append(&MenuItem::with_id(
         app,
@@ -142,32 +105,17 @@ pub fn build_menu<R: Runtime>(
         true,
         None::<&str>,
     )?)?;
-    list.append(&MenuItem::with_id(
-        app,
-        MENU_FILTER,
-        filter_caption(filter),
-        true,
-        None::<&str>,
-    )?)?;
     list.append(&PredefinedMenuItem::separator(app)?)?;
-    let shown: Vec<_> = notes
-        .iter()
-        .filter(|note| label_matches(&display_label(note), filter))
-        .collect();
-    if shown.is_empty() {
+    if notes.is_empty() {
         list.append(&MenuItem::with_id(
             app,
             "note-list-empty",
-            if filter.trim().is_empty() {
-                "还没有便签"
-            } else {
-                "没有匹配的便签"
-            },
+            "还没有便签",
             false,
             None::<&str>,
         )?)?;
     } else {
-        for note in shown {
+        for note in notes {
             list.append(&CheckMenuItem::with_id(
                 app,
                 format!("{NOTE_PREFIX}{}", note.id),
@@ -200,7 +148,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .tooltip("便签")
         // 主键直接出菜单，不依赖平台 click 事件（Linux 不提供）。
         .show_menu_on_left_click(true)
-        .menu(&build_menu(app, &[], "")?)
+        .menu(&build_menu(app, &[])?)
         .build(app)?;
     Ok(())
 }
@@ -211,8 +159,7 @@ pub fn rebuild<R: Runtime>(app: &AppHandle<R>) {
     let Some(tray) = app.tray_by_id("main") else {
         return;
     };
-    let filter = app.state::<LabelFilter>().get();
-    match build_menu(app, &notes, &filter) {
+    match build_menu(app, &notes) {
         Ok(menu) => {
             if let Err(err) = tray.set_menu(Some(menu)) {
                 eprintln!("重建托盘菜单失败: {err}");
@@ -230,8 +177,6 @@ pub fn parse_id(id: &str) -> MenuAction {
         MenuAction::SetAll(true)
     } else if id == MENU_HIDE_ALL {
         MenuAction::SetAll(false)
-    } else if id == MENU_FILTER {
-        MenuAction::Filter
     } else if id == MENU_QUIT {
         MenuAction::Quit
     } else if let Some(note) = id.strip_prefix(NOTE_PREFIX) {
@@ -245,7 +190,6 @@ pub fn parse_id(id: &str) -> MenuAction {
 pub enum MenuAction {
     New,
     SetAll(bool),
-    Filter,
     ToggleVisible(String),
     Quit,
     Ignore,
@@ -260,7 +204,6 @@ mod tests {
         assert_eq!(parse_id("new"), MenuAction::New);
         assert_eq!(parse_id("show-all"), MenuAction::SetAll(true));
         assert_eq!(parse_id("hide-all"), MenuAction::SetAll(false));
-        assert_eq!(parse_id("filter-labels"), MenuAction::Filter);
         assert_eq!(parse_id("quit"), MenuAction::Quit);
         assert_eq!(
             parse_id("note:abc"),
@@ -269,16 +212,6 @@ mod tests {
         assert_eq!(parse_id("别的"), MenuAction::Ignore);
     }
 
-
-    #[test]
-    fn label_filter_matches_text_not_id() {
-        assert!(label_matches("买牛奶", ""));
-        assert!(label_matches("买牛奶", " 牛奶 "));
-        assert!(label_matches("Buy Milk", "buy"));
-        assert!(!label_matches("买牛奶", "面包"));
-        assert_eq!(filter_caption(""), "过滤标签");
-        assert_eq!(filter_caption(" 牛奶 "), "过滤标签：牛奶");
-    }
 
     #[test]
     fn empty_title_uses_the_first_body_line() {

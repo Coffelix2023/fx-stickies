@@ -8,11 +8,11 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
 };
 
-use crate::frame::Rect;
+use crate::frame::{Placement, Rect};
 use crate::note::{DEFAULT_HEIGHT, DEFAULT_WIDTH, MIN_HEIGHT, MIN_WIDTH, Note};
 
 /// 窗口当前应当采用的 frame。展开尺寸先抬到手动缩放下限：窗口层只约束以后的手动缩放，
@@ -150,10 +150,18 @@ fn menu_url(id: &str) -> WebviewUrl {
 /// 菜单窗口 label 前缀。它同时是「这个窗口是不是菜单」的判据。
 pub(crate) const MENU_LABEL_PREFIX: &str = "menu-";
 
-/// 菜单窗口尺寸：菜单卡片 208×300，四周留 16px 给 CSS 阴影。
+/// 菜单窗口尺寸：菜单卡片 208×359，四周留 16px 给 CSS 阴影。
+/// shortcut: 这 16px 是 note-menu.css 里 `.menu-window #root` 的 padding，两边要一致；
+/// 卡片靠这个内缩量和按钮错开，改一处要改两处。
+/// shortcut: 高度必须容得下卡片，改结构后量一次卡片的 getBoundingClientRect().height，
+/// 再加 2×阴影留白和余量：底色两行 58 + 底纹 36 + 对齐九宫格三行 28×3 + 三个标签 24×3
+/// + 隐藏删除 26×2 + 分隔线 8×3 + 卡片内边距 8 = 359。少留窗口会被裁掉最后一行。
 const MENU_WINDOW_WIDTH: f64 = 240.0;
-const MENU_WINDOW_HEIGHT: f64 = 340.0;
-const MENU_SHADOW_PAD: f64 = 16.0;
+const MENU_WINDOW_HEIGHT: f64 = 420.0;
+
+/// 触发按钮的边长，前端 `NoteMenu` 的按钮就是 18×18。
+/// shortcut: 必须与 NoteMenu.tsx 的 size-[18px] 一致，改一处要改两处。
+const MENU_ANCHOR_SIZE: f64 = 18.0;
 
 /// 触发按钮在便签视口里的位置，CSS 像素。前端量出来交给窗口层换算屏幕坐标。
 #[derive(Debug, Clone, Copy, serde::Deserialize)]
@@ -172,8 +180,11 @@ fn menu_origin<R: Runtime>(note_window: &WebviewWindow<R>, anchor: MenuAnchor) -
         .outer_position()
         .map_err(|err| err.to_string())?
         .to_logical::<f64>(scale);
-    let mut x = origin.x + anchor.right + 6.0 - MENU_SHADOW_PAD;
-    let mut y = origin.y + anchor.bottom + 4.0 - MENU_SHADOW_PAD;
+    // 窗口从按钮右下角开始排。卡片在窗口里内缩 16px 阴影留白，所以卡片看起来离按钮
+    // 16px；反过来提前留白会让窗口的透明区压住按钮 —— 指针落在按钮上却被菜单窗口
+    // 吃掉，按钮既收不到 hover 也点不到，「再点一次收起」就没法做。
+    let mut x = origin.x + anchor.right;
+    let mut y = origin.y + anchor.bottom;
 
     if let Ok(Some(monitor)) = note_window.current_monitor() {
         let monitor_scale = monitor.scale_factor();
@@ -183,7 +194,8 @@ fn menu_origin<R: Runtime>(note_window: &WebviewWindow<R>, anchor: MenuAnchor) -
         let max_x = area_pos.x + area_size.width;
         let max_y = area_pos.y + area_size.height;
         if x + MENU_WINDOW_WIDTH > max_x {
-            x = origin.x + anchor.right - MENU_WINDOW_WIDTH + MENU_SHADOW_PAD;
+            // 翻到按钮左边，并让开按钮本身的宽度，保证不压住按钮。
+            x = (origin.x + anchor.right - MENU_ANCHOR_SIZE - MENU_WINDOW_WIDTH).max(area_pos.x);
         }
         if y + MENU_WINDOW_HEIGHT > max_y {
             y = (max_y - MENU_WINDOW_HEIGHT).max(area_pos.y);
@@ -446,6 +458,51 @@ fn open_menu_window<R: Runtime>(
     open_menu(&app, &id, anchor)
 }
 
+/// 对齐的执行部分。`area` 由调用方给，测试才能喂假显示器数据。
+/// 窗口不在或拿不到可见区域时原样返回，不动窗口也不写盘。
+fn align_note_to<R: Runtime>(
+    app: &AppHandle<R>,
+    dir: &Path,
+    id: &str,
+    area: Option<Rect>,
+    placement: Placement,
+) -> Result<Note, String> {
+    let mut note = note::load(dir, id).map_err(|err| err.to_string())?;
+    let (Some(area), Some(window)) = (area, app.get_webview_window(id)) else {
+        return Ok(note);
+    };
+    // 尺寸取窗口当前的：这里只挪位置，缩放交给手动缩放。
+    let target = frame::align(live_frame(&window)?, area, placement);
+    window
+        .set_position(LogicalPosition::new(target.x, target.y))
+        .map_err(|err| err.to_string())?;
+    if target != note.frame {
+        note.frame = target;
+        note::save(dir, &note).map_err(|err| err.to_string())?;
+    }
+    Ok(note)
+}
+
+/// 把一张便签贴到屏幕的某个位置。屏幕坐标只有窗口层知道，所以走命令：
+/// 它算好坐标、移动窗口、写回文档，并把磁盘上的最新版本返回给前端。
+/// 目标是窗口当前所在的那块屏，多屏时不会跳到别的屏去。
+#[tauri::command]
+fn align_note<R: Runtime>(
+    app: AppHandle<R>,
+    id: String,
+    placement: Placement,
+) -> Result<Note, String> {
+    let dir = notes_dir(&app)?;
+    let area = app.get_webview_window(&id).and_then(|window| {
+        window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .map(|monitor| monitor_rect(&monitor))
+            .or_else(|| monitor_rects(&app).first().copied())
+    });
+    align_note_to(&app, &dir, &id, area, placement)
+}
 /// 收起菜单窗口。窗口不在时按成功处理，重复收起不出错。
 #[tauri::command]
 fn close_menu_window<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(), String> {
@@ -508,7 +565,6 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, dir: &Path, id: &str) {
                 eprintln!("批量切换可见性失败: {err}");
             }
         }
-        tray::MenuAction::Filter => ask_label_filter(app),
         tray::MenuAction::ToggleVisible(ref note_id) => {
             let visible = note::load(dir, note_id).map(|note| !note.visible);
             match visible {
@@ -525,44 +581,7 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, dir: &Path, id: &str) {
             app.exit(0);
         }
     }
-    // 过滤自己决定是否重建菜单。取消输入时菜单保持原样。
-    if !matches!(action, tray::MenuAction::Filter) {
-        tray::rebuild(app);
-    }
-}
-
-
-/// 过滤词来自一次系统输入。原生托盘菜单没有文本框，所以点菜单项后再问。
-fn ask_label_filter<R: Runtime>(app: &AppHandle<R>) {
-    let current = app.state::<tray::LabelFilter>().get();
-    let next = match prompt_label_filter(&current) {
-        Some(query) => query,
-        None => return,
-    };
-    app.state::<tray::LabelFilter>().set(&next);
     tray::rebuild(app);
-}
-
-/// macOS 用系统对话框收一个短过滤词。其他平台没有这个对话框，过滤保持空。
-#[cfg(target_os = "macos")]
-fn prompt_label_filter(current: &str) -> Option<String> {
-    let script = format!(
-        "set answer to text returned of (display dialog \"按便签标签过滤，留空显示全部\" default answer {current:?} buttons {{\"取消\", \"过滤\"}} default button \"过滤\")\nanswer",
-    );
-    let output = std::process::Command::new("osascript")
-        .arg("-e")
-        .arg(script)
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    Some(String::from_utf8(output.stdout).ok()?.trim().to_string())
-}
-
-#[cfg(not(target_os = "macos"))]
-fn prompt_label_filter(_current: &str) -> Option<String> {
-    None
 }
 
 
@@ -603,7 +622,6 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .manage(tray::LabelFilter::default())
         .manage(FrameWrites::default())
         .invoke_handler(tauri::generate_handler![
             new_note,
@@ -612,6 +630,7 @@ pub fn run() {
             set_pinned,
             set_visible,
             delete_note,
+            align_note,
             open_menu_window,
             close_menu_window
         ])
@@ -627,6 +646,18 @@ pub fn run() {
                     if window.label().starts_with(MENU_LABEL_PREFIX) =>
                 {
                     let _ = window.close();
+                }
+                // 菜单关掉都要通知便签窗口一声（点外面、Escape、收起、点按钮关闭）。
+                // 不通知的话按钮以为菜单还开着，再点一次会去「关」一个已经关掉的窗口，
+                // 表现为点了没反应。
+                tauri::WindowEvent::CloseRequested { .. } | tauri::WindowEvent::Destroyed
+                    if window.label().starts_with(MENU_LABEL_PREFIX) =>
+                {
+                    if let Some(id) = window.label().strip_prefix(MENU_LABEL_PREFIX) {
+                        let _ = window
+                            .app_handle()
+                            .emit_to(id, "note-menu-closed", serde_json::json!({ "id": id }));
+                    }
                 }
                 // 拖动和缩放后把位置与尺寸记回文档，重启或强杀后仍在原处。
                 tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
@@ -760,6 +791,41 @@ mod tests {
         assert!(note::load(&dir, "n1").unwrap().pinned);
     }
 
+    #[test]
+    fn aligning_moves_the_window_and_records_the_frame() {
+        let app = mock_app();
+        let dir = test_dir();
+        let mut note = test_note("n1");
+        note.frame = Rect::new(500.0, 400.0, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        note::save(&dir, &note).unwrap();
+        show_at(app.handle(), &note, note.frame).unwrap();
+
+        // shortcut: MockRuntime 的窗口位置和尺寸恒为 0、也取不到显示器，
+        // 所以这里只钉住「算出的坐标写回了文档」；尺寸相关的算法在 frame::align 的测试里。
+        let area = Some(Rect::new(0.0, 25.0, 1920.0, 1055.0));
+        let aligned = align_note_to(app.handle(), &dir, "n1", area, Placement::TopLeft).unwrap();
+
+        assert_eq!(aligned.frame, Rect::new(12.0, 37.0, 0.0, 0.0));
+        assert_eq!(note::load(&dir, "n1").unwrap().frame, aligned.frame);
+    }
+
+    #[test]
+    fn aligning_without_a_visible_area_keeps_the_frame() {
+        let app = mock_app();
+        let dir = test_dir();
+        let note = test_note("n1");
+        note::save(&dir, &note).unwrap();
+        show_at(app.handle(), &note, note.frame).unwrap();
+
+        // 拿不到可见区域就无从判断该贴哪，原样返回而不是乱挪窗口。
+        assert_eq!(
+            align_note_to(app.handle(), &dir, "n1", None, Placement::Center)
+                .unwrap()
+                .frame,
+            note.frame
+        );
+    }
+
 
 
 
@@ -790,8 +856,9 @@ mod tests {
     }
 
     #[test]
-    fn menu_origin_sits_below_right_of_the_button() {
-        // MockRuntime 下窗口在 (0,0)，所以菜单左上角就是锚点减掉阴影留白。
+    fn menu_window_starts_at_the_button_corner() {
+        // MockRuntime 下窗口在 (0,0)，菜单窗口左上角就落在按钮的右下角：
+        // 再往回缩就会盖住按钮，按钮点不到、也收不到 hover。
         // shortcut: 真正建窗口要 bind 真实 NSWindow，MockRuntime 会段错，
         // 所以这里只钉定位；窗口能否建出来由实机验收覆盖。
         let app = mock_app();
@@ -807,8 +874,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(x, 200.0 + 6.0 - MENU_SHADOW_PAD);
-        assert_eq!(y, 20.0 + 4.0 - MENU_SHADOW_PAD);
+        assert_eq!(x, 200.0);
+        assert_eq!(y, 20.0);
     }
 
     #[test]
@@ -891,12 +958,12 @@ mod tests {
         incoming.spine_size = note::SpineSize::Max;
         incoming.visible = true;
         incoming.title = "改过的标题".into();
-        incoming.paper = Paper::PearlBeige;
+        incoming.paper = Paper::LightApricot;
 
         let merged = save_note_content(&dir, &incoming).unwrap();
 
         assert_eq!(merged.title, "改过的标题");
-        assert_eq!(merged.paper, Paper::PearlBeige);
+        assert_eq!(merged.paper, Paper::LightApricot);
         // 窗口层负责的字段保留磁盘上的值
         assert_eq!(merged.frame, Rect::new(10.0, 20.0, 300.0, 200.0));
         assert!(merged.pinned);

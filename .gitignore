@@ -31,3 +31,4 @@ dist-ssr
 # agent 运行产物
 .pi/reviews/
 .pi/subagent/
+docs/

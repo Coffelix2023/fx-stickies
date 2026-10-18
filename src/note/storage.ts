@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-import { asNote, type Note, noteSchema } from "./document";
+import { asNote, type Note, type Placement, noteSchema } from "./document";
 
 /** 读取并校验一份文档。校验失败时抛出，界面因此不渲染内容。 */
 export async function getNote(id: string): Promise<Note> {
@@ -17,6 +17,10 @@ export async function setPinned(id: string, pinned: boolean): Promise<Note> {
   return asNote(noteSchema.parse(await invoke("set_pinned", { id, pinned })));
 }
 
+/** 把便签贴到屏幕的某个位置。屏幕坐标只有窗口层知道，所以走命令，它顺带写回文档。 */
+export async function alignNote(id: string, placement: Placement): Promise<Note> {
+  return asNote(noteSchema.parse(await invoke("align_note", { id, placement })));
+}
 /**
  * 关闭一张便签的窗口。Rust 侧先把窗口位置写回文档再关窗，并刷新托盘列表。
  * 窗口随之销毁，invoke 的返回值到不了前端，所以这里不解析。

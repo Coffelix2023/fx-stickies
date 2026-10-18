@@ -75,6 +75,52 @@ pub fn fit(frame: Rect, monitors: &[Rect]) -> Rect {
     }
 }
 
+/// 窗口对齐到屏幕可见区域的哪个位置。取值与前端 `PLACEMENTS` 一一对应。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Placement {
+    TopLeft,
+    TopCenter,
+    TopRight,
+    MiddleLeft,
+    Center,
+    MiddleRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight,
+}
+
+/// 对齐时离屏幕边缘留的缝。贴死边会把便签的圆角和投影切掉。
+const ALIGN_GAP: f64 = 12.0;
+
+/// 把 frame 贴到 area 的某个位置，尺寸不动。
+/// 窗口比可见区域还大时上下界会颠倒，和 `fit` 一样兜到区域左上角。
+pub fn align(frame: Rect, area: Rect, placement: Placement) -> Rect {
+    let x = match placement {
+        Placement::TopLeft | Placement::MiddleLeft | Placement::BottomLeft => area.x + ALIGN_GAP,
+        Placement::TopCenter | Placement::Center | Placement::BottomCenter => {
+            area.x + (area.width - frame.width) / 2.0
+        }
+        Placement::TopRight | Placement::MiddleRight | Placement::BottomRight => {
+            area.right() - frame.width - ALIGN_GAP
+        }
+    };
+    let y = match placement {
+        Placement::TopLeft | Placement::TopCenter | Placement::TopRight => area.y + ALIGN_GAP,
+        Placement::MiddleLeft | Placement::Center | Placement::MiddleRight => {
+            area.y + (area.height - frame.height) / 2.0
+        }
+        Placement::BottomLeft | Placement::BottomCenter | Placement::BottomRight => {
+            area.bottom() - frame.height - ALIGN_GAP
+        }
+    };
+    Rect {
+        x: x.max(area.x),
+        y: y.max(area.y),
+        ..frame
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,6 +189,86 @@ mod tests {
         let frame = Rect::new(-500.0, -500.0, 300.0, 200.0);
 
         assert_eq!(fit(frame, &monitors), Rect::new(0.0, 0.0, 300.0, 200.0));
+    }
+
+    /// 主屏的可见工作区：起点 (0, 25)，右边缘 1920，下边缘 1080。
+    fn work_area() -> Rect {
+        monitor(0.0, 25.0, 1920.0, 1055.0)
+    }
+
+    #[test]
+    fn align_corners_sit_a_gap_inside_the_work_area() {
+        let frame = Rect::new(500.0, 400.0, 300.0, 200.0);
+
+        assert_eq!(
+            align(frame, work_area(), Placement::TopLeft),
+            Rect::new(12.0, 37.0, 300.0, 200.0)
+        );
+        assert_eq!(
+            align(frame, work_area(), Placement::TopRight),
+            Rect::new(1608.0, 37.0, 300.0, 200.0)
+        );
+        assert_eq!(
+            align(frame, work_area(), Placement::BottomLeft),
+            Rect::new(12.0, 868.0, 300.0, 200.0)
+        );
+        assert_eq!(
+            align(frame, work_area(), Placement::BottomRight),
+            Rect::new(1608.0, 868.0, 300.0, 200.0)
+        );
+    }
+
+    #[test]
+    fn align_edges_keep_the_other_axis_and_center_splits_the_difference() {
+        let frame = Rect::new(500.0, 400.0, 300.0, 200.0);
+        let area = work_area();
+
+        // 靠顶/靠底边：水平居中，纵向贴边
+        assert_eq!(
+            align(frame, area, Placement::TopCenter),
+            Rect::new(810.0, 37.0, 300.0, 200.0)
+        );
+        assert_eq!(
+            align(frame, area, Placement::BottomCenter),
+            Rect::new(810.0, 868.0, 300.0, 200.0)
+        );
+        // 靠左/靠右边：纵向居中，横向贴边
+        assert_eq!(
+            align(frame, area, Placement::MiddleLeft),
+            Rect::new(12.0, 452.5, 300.0, 200.0)
+        );
+        assert_eq!(
+            align(frame, area, Placement::MiddleRight),
+            Rect::new(1608.0, 452.5, 300.0, 200.0)
+        );
+        // 居中：两个方向都不留缝
+        assert_eq!(
+            align(frame, area, Placement::Center),
+            Rect::new(810.0, 452.5, 300.0, 200.0)
+        );
+    }
+
+    #[test]
+    fn align_window_larger_than_the_work_area_lands_at_its_origin() {
+        let frame = Rect::new(0.0, 0.0, 300.0, 200.0);
+
+        assert_eq!(
+            align(
+                frame,
+                monitor(0.0, 25.0, 200.0, 150.0),
+                Placement::BottomRight
+            ),
+            Rect::new(0.0, 25.0, 300.0, 200.0)
+        );
+    }
+
+    #[test]
+    fn align_keeps_the_window_size() {
+        let frame = Rect::new(500.0, 400.0, 300.0, 200.0);
+
+        let aligned = align(frame, work_area(), Placement::Center);
+        assert_eq!(aligned.width, frame.width);
+        assert_eq!(aligned.height, frame.height);
     }
 
     #[test]

@@ -66,21 +66,97 @@
   outline-offset: -2px;
 }
 
-/* 单选行 - 左侧留对勾位 */
-.note-menu-row[role="menuitemradio"] {
-  padding-left: 28px;
-  position: relative;
+/* 底纹 - 三个横排的单选按钮，选中态由圆点图标自己表示 */
+.pattern-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 6px 8px;
 }
 
-.note-menu-row[role="menuitemradio"][aria-checked="true"]::before {
-  content: "✓";
-  position: absolute;
-  left: 10px;
-  font-size: 13px;
-  font-weight: 600;
+.pattern-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: default;
+  transition: background-color 0.08s ease, color 0.08s ease;
+}
+
+/* 圆点：未选是空心圈，选中填成主色 */
+.pattern-item::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+}
+
+.pattern-item:hover {
+  background: rgba(0, 122, 255, 0.08);
+}
+
+.pattern-item:focus-visible {
+  outline: 2px solid rgba(0, 122, 255, 0.8);
+  outline-offset: -2px;
+}
+
+.pattern-item[aria-checked="true"] {
   color: rgb(0, 122, 255);
 }
 
+.pattern-item[aria-checked="true"]::before {
+  border-color: rgb(0, 122, 255);
+  background: rgb(0, 122, 255);
+}
+
+/* 对齐到屏幕 - 罗盘九宫格，箭头指哪边就贴哪边 */
+.align-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.align-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: default;
+  transition: background-color 0.08s ease;
+}
+
+/* 居中格：实心方块 = 便签原地不动，箭头都不指 */
+.align-item[data-action="align-center"] svg {
+  fill: currentColor;
+}
+
+.align-item:hover {
+  background: rgba(0, 122, 255, 0.08);
+}
+
+.align-item:focus-visible {
+  outline: 2px solid rgba(0, 122, 255, 0.8);
+  outline-offset: -2px;
+}
+/* 删除是危险操作，红色 */
+.note-menu-row[data-action="delete"] {
+  color: #e5484d;
+}
 /* 分隔线 - 细灰线 */
 .note-menu-panel [role="separator"] {
   margin: 4px 0;
@@ -102,16 +178,16 @@
 /* 色块网格容器 */
 .paper-color-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, 24px);
+  justify-content: center;
   gap: 6px;
   padding: 6px 8px;
 }
 
-/* 色块项 - 圆角方块，选中显示对勾 */
+/* 色块项 - 圆角方块，选中用高亮色边框 */
 .paper-color-item {
-  position: relative;
-  width: 32px;
-  height: 28px;
+  width: 24px;
+  height: 20px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 4px;
   padding: 0;
@@ -129,19 +205,10 @@
   outline-offset: 1px;
 }
 
-/* 选中态对勾 - 白色实心，黑色描边 */
-.paper-color-item[data-state="checked"]::after {
-  content: "✓";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 14px;
-  font-weight: 700;
-  color: white;
-  text-shadow:
-    0 0 2px rgba(0, 0, 0, 0.8),
-    0 1px 1px rgba(0, 0, 0, 0.5);
+/* 选中态 - 高亮描边环。色块本身是浅色，白色对勾压在中间几乎看不见。 */
+.paper-color-item[data-state="checked"] {
+  outline: 2px solid rgb(0 122 255);
+  outline-offset: 1px;
 }
 
 /* Dark mode 适配 */
@@ -165,6 +232,27 @@
 
   .note-menu-label {
     color: rgba(255, 255, 255, 0.5);
+  }
+
+  /* 深色底上 #007AFF 的对比度不够，选中态整体提亮一档。 */
+  .pattern-item[aria-checked="true"] {
+    color: rgb(64, 160, 255);
+  }
+
+  .pattern-item::before {
+    border-color: rgba(255, 255, 255, 0.35);
+  }
+
+  .pattern-item[aria-checked="true"]::before {
+    border-color: rgb(64, 160, 255);
+    background: rgb(64, 160, 255);
+  }
+
+  .align-item:hover {
+    background: rgba(60, 130, 246, 0.15);
+  }
+  .pattern-item:hover {
+    background: rgba(60, 130, 246, 0.15);
   }
 
   .paper-color-item {
