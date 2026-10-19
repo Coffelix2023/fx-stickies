@@ -30,6 +30,7 @@ export type NoteMenuAction =
   | { kind: "statusSize"; size: StatusSize }
   | { kind: "statusFaded"; faded: boolean }
   | { kind: "frozenRows"; rows: number }
+  | { kind: "export"; format: "markdown" | "text" | "docx" }
   | { kind: "fontScale"; step: number }
   | { kind: "align"; placement: Placement }
   | { kind: "hide" }
@@ -145,6 +146,15 @@ export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, frozenR
           text: "隐藏便签",
           action: () => onAction({ kind: "hide" }),
         }),
+        await Submenu.new({
+          text: "导出便签",
+          items: [
+            await MenuItem.new({ text: "Markdown (.md)", action: () => onAction({ kind: "export", format: "markdown" }) }),
+            await MenuItem.new({ text: "纯文本 (.txt)", action: () => onAction({ kind: "export", format: "text" }) }),
+            await MenuItem.new({ text: "Word (.docx)", action: () => onAction({ kind: "export", format: "docx" }) }),
+          ],
+        }),
+        await PredefinedMenuItem.new({ item: "Separator" }),
         await MenuItem.new({
           text: "删除便签…",
           action: () => onAction({ kind: "delete" }),

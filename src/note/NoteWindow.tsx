@@ -1,4 +1,7 @@
 import { confirm } from "@tauri-apps/plugin-dialog";
+import { Document, Packer, Paragraph, TextRun } from "docx";
+import { save } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 
 import { NoteEditor } from "./NoteEditor";
@@ -29,6 +32,76 @@ export const SAVE_DELAY_MS = 400;
  * 一张便签的窗口内容。文档是唯一事实来源：界面只改这份 state，
  * 改动统一延迟写回磁盘，不做第二次套壳。
  */
+async function exportNote(note: any, format: "markdown" | "text" | "docx") {
+  const page = note.content?.[note.activeTab];
+  const ext = format === "markdown" ? "md" : format === "text" ? "txt" : "docx";
+  const path = await save({ defaultPath: `note.${ext}` });
+  if (!path) return;
+  if (format === "text") {
+    await invoke("export_write_text", { path, content: toText(page) });
+  } else if (format === "markdown") {
+    await invoke("export_write_text", { path, content: toMarkdown(page) });
+  } else {
+    const doc = new Document({ sections: [{ children: toDocxParagraphs(page) }] });
+    const blob = await Packer.toBlob(doc);
+    const buf = await blob.arrayBuffer();
+    await invoke("export_write_bytes", { path, bytes: Array.from(new Uint8Array(buf)) });
+  }
+}
+
+function nodeText(node: any): string {
+  if (!node) return "";
+  if (node.type === "text") return node.text ?? "";
+  return (node.content ?? []).map(nodeText).join("");
+}
+
+function toText(doc: any): string {
+  const out: string[] = [];
+  for (const n of doc?.content ?? []) {
+    if (n.type === "paragraph" || n.type?.startsWith("heading")) out.push(nodeText(n));
+    else if (n.type === "bulletList" || n.type === "orderedList") {
+      for (const li of n.content ?? []) out.push("- " + nodeText(li));
+    } else out.push(nodeText(n));
+  }
+  return out.join("\n");
+}
+
+function toMarkdown(doc: any): string {
+  const out: string[] = [];
+  for (const n of doc?.content ?? []) {
+    if (n.type === "heading") {
+      const lvl = n.attrs?.level ?? 1;
+      out.push("#".repeat(lvl) + " " + nodeText(n));
+    } else if (n.type === "paragraph") {
+      out.push(nodeText(n));
+    } else if (n.type === "bulletList") {
+      for (const li of n.content ?? []) out.push("- " + nodeText(li));
+    } else if (n.type === "orderedList") {
+      (n.content ?? []).forEach((li: any, i: number) => out.push(`${i + 1}. ` + nodeText(li)));
+    } else if (n.type === "codeBlock") {
+      out.push("```\n" + nodeText(n) + "\n```");
+    } else if (n.type === "horizontalRule") {
+      out.push("---");
+    } else {
+      out.push(nodeText(n));
+    }
+  }
+  return out.join("\n\n");
+}
+
+function toDocxParagraphs(doc: any): any[] {
+  const paras: any[] = [];
+  for (const n of doc?.content ?? []) {
+    if (n.type === "heading") {
+      paras.push(new Paragraph({ text: nodeText(n), heading: `Heading${n.attrs?.level ?? 1}` as any }));
+    } else if (n.type === "paragraph") {
+      paras.push(new Paragraph({ children: [new TextRun(nodeText(n))] }));
+    } else {
+      paras.push(new Paragraph({ children: [new TextRun(nodeText(n))] }));
+    }
+  }
+  return paras;
+}
 export function NoteWindow({ id }: { id: string }) {
   const [note, setNote] = useState<Note | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +153,8 @@ export function NoteWindow({ id }: { id: string }) {
       setNote((prev) => (prev ? { ...prev, statusFaded: action.faded } : prev));
     } else if (action.kind === "frozenRows") {
       setNote((prev) => (prev ? { ...prev, frozenRows: action.rows } : prev));
+    } else if (action.kind === "export") {
+      void exportNote(note, action.format);
     } else if (action.kind === "fontScale") {
       setNote((prev) =>
         prev ? { ...prev, fontSize: scaleFontSize(prev.fontSize, action.step) } : prev,

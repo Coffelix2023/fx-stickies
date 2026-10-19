@@ -186,7 +186,7 @@ impl Note {
             tabs: vec![page.clone()],
             active_tab: page.clone(),
             content: BTreeMap::from([(page, empty_doc())]),
-            paper: Paper::AlabasterGrey,
+            paper: Paper::LightApricot,
             pattern: Pattern::Plain,
             pinned: false,
             translucent: false,
@@ -372,7 +372,7 @@ mod tests {
         assert_eq!(note.tabs[0], note.active_tab);
         assert_eq!(note.content.len(), 1);
         assert_eq!(note.content[&note.active_tab], empty_doc());
-        assert_eq!(note.paper, Paper::AlabasterGrey);
+        assert_eq!(note.paper, Paper::LightApricot);
         assert_eq!(note.pattern, Pattern::Plain);
         assert_eq!(note.font_size, DEFAULT_FONT_SIZE);
         assert!(!note.toolbar);

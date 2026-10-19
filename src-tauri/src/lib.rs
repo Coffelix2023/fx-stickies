@@ -219,6 +219,15 @@ fn create<R: Runtime>(app: &AppHandle<R>) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn export_write_text(path: String, content: String) -> Result<(), String> {
+    std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn export_write_bytes(path: String, bytes: Vec<u8>) -> Result<(), String> {
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())
+}
+#[tauri::command]
 fn new_note<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
     create(&app)
 }
@@ -550,7 +559,14 @@ fn on_run_event<R: Runtime>(handle: &AppHandle<R>, event: tauri::RunEvent) {
             Err(err) => eprintln!("创建托盘失败: {err}"),
         }
         match notes_dir(handle) {
-            Ok(dir) => restore_visible(handle, &dir),
+            Ok(dir) => {
+    let empty = std::fs::read_dir(&dir).map(|mut d| d.next().is_none()).unwrap_or(true);
+    if empty {
+        let _ = create(handle);
+    } else {
+        restore_visible(handle, &dir);
+    }
+}
             Err(err) => eprintln!("无法定位便签目录: {err}"),
         }
         tray::rebuild(handle);
@@ -570,6 +586,8 @@ pub fn run() {
         .manage(FrameWrites::default())
         .invoke_handler(tauri::generate_handler![
             new_note,
+            export_write_text,
+            export_write_bytes,
             get_note,
             save_note,
             set_pinned,
