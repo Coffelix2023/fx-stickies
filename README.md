@@ -23,6 +23,8 @@ The macOS Stacks app cannot do WYSIWYG editing, pastes carry source styling, and
 - **标题栏尺寸** — 「外观 > 标题栏」四档（小/默认/大/超大），同时缩放脊条、工具栏、色块行的高度与图标，默认档是原来的 20px；档位随便签存盘
 - **原子写入** — 先写同目录临时文件再改名，中断不会写坏原文件
 
+- **首次启动** — 没有便签时自动新建一张，底色默认浅杏，位置贴到光标所在屏左上
+- **导出便签** — 「更多操作 → 导出便签」支持 Markdown / 纯文本 / Word (.docx)
 ## 技术栈 Stack
 
 | 层 Layer | 技术 |
