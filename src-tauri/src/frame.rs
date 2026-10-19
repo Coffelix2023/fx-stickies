@@ -90,28 +90,27 @@ pub enum Placement {
     BottomRight,
 }
 
-/// 对齐时离屏幕边缘留的缝。贴死边会把便签的圆角和投影切掉。
-const ALIGN_GAP: f64 = 12.0;
-
 /// 把 frame 贴到 area 的某个位置，尺寸不动。
+/// 贴的是可见区域的边，不留缝：macOS 的工作区已经避开了菜单栏和 Dock，
+/// 再留一圈会看着没对齐。
 /// 窗口比可见区域还大时上下界会颠倒，和 `fit` 一样兜到区域左上角。
 pub fn align(frame: Rect, area: Rect, placement: Placement) -> Rect {
     let x = match placement {
-        Placement::TopLeft | Placement::MiddleLeft | Placement::BottomLeft => area.x + ALIGN_GAP,
+        Placement::TopLeft | Placement::MiddleLeft | Placement::BottomLeft => area.x,
         Placement::TopCenter | Placement::Center | Placement::BottomCenter => {
             area.x + (area.width - frame.width) / 2.0
         }
         Placement::TopRight | Placement::MiddleRight | Placement::BottomRight => {
-            area.right() - frame.width - ALIGN_GAP
+            area.right() - frame.width
         }
     };
     let y = match placement {
-        Placement::TopLeft | Placement::TopCenter | Placement::TopRight => area.y + ALIGN_GAP,
+        Placement::TopLeft | Placement::TopCenter | Placement::TopRight => area.y,
         Placement::MiddleLeft | Placement::Center | Placement::MiddleRight => {
             area.y + (area.height - frame.height) / 2.0
         }
         Placement::BottomLeft | Placement::BottomCenter | Placement::BottomRight => {
-            area.bottom() - frame.height - ALIGN_GAP
+            area.bottom() - frame.height
         }
     };
     Rect {
@@ -197,24 +196,24 @@ mod tests {
     }
 
     #[test]
-    fn align_corners_sit_a_gap_inside_the_work_area() {
+    fn align_corners_sit_on_the_work_area_edge() {
         let frame = Rect::new(500.0, 400.0, 300.0, 200.0);
 
         assert_eq!(
             align(frame, work_area(), Placement::TopLeft),
-            Rect::new(12.0, 37.0, 300.0, 200.0)
+            Rect::new(0.0, 25.0, 300.0, 200.0)
         );
         assert_eq!(
             align(frame, work_area(), Placement::TopRight),
-            Rect::new(1608.0, 37.0, 300.0, 200.0)
+            Rect::new(1620.0, 25.0, 300.0, 200.0)
         );
         assert_eq!(
             align(frame, work_area(), Placement::BottomLeft),
-            Rect::new(12.0, 868.0, 300.0, 200.0)
+            Rect::new(0.0, 880.0, 300.0, 200.0)
         );
         assert_eq!(
             align(frame, work_area(), Placement::BottomRight),
-            Rect::new(1608.0, 868.0, 300.0, 200.0)
+            Rect::new(1620.0, 880.0, 300.0, 200.0)
         );
     }
 
@@ -226,20 +225,20 @@ mod tests {
         // 靠顶/靠底边：水平居中，纵向贴边
         assert_eq!(
             align(frame, area, Placement::TopCenter),
-            Rect::new(810.0, 37.0, 300.0, 200.0)
+            Rect::new(810.0, 25.0, 300.0, 200.0)
         );
         assert_eq!(
             align(frame, area, Placement::BottomCenter),
-            Rect::new(810.0, 868.0, 300.0, 200.0)
+            Rect::new(810.0, 880.0, 300.0, 200.0)
         );
         // 靠左/靠右边：纵向居中，横向贴边
         assert_eq!(
             align(frame, area, Placement::MiddleLeft),
-            Rect::new(12.0, 452.5, 300.0, 200.0)
+            Rect::new(0.0, 452.5, 300.0, 200.0)
         );
         assert_eq!(
             align(frame, area, Placement::MiddleRight),
-            Rect::new(1608.0, 452.5, 300.0, 200.0)
+            Rect::new(1620.0, 452.5, 300.0, 200.0)
         );
         // 居中：两个方向都不留缝
         assert_eq!(

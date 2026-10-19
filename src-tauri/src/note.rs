@@ -110,6 +110,9 @@ pub struct Note {
     pub pinned: bool,
     pub translucent: bool,
     pub collapsed: bool,
+    /// 冻结的正文行数：滚动时前 N 行固定在顶部。旧文档没有这个字段，按 0 读进来。
+    #[serde(default)]
+    pub frozen_rows: i64,
     /// 正文字号，单位 px。旧文档没有这个字段，读进来落回 `DEFAULT_FONT_SIZE`。
     #[serde(default = "default_font_size")]
     pub font_size: f64,
@@ -188,6 +191,7 @@ impl Note {
             pinned: false,
             translucent: false,
             collapsed: false,
+            frozen_rows: 0,
             font_size: DEFAULT_FONT_SIZE,
             toolbar: false,
             spine_size: SpineSize::Min,

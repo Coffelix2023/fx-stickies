@@ -29,6 +29,7 @@ export type NoteMenuAction =
   | { kind: "chromeSize"; size: ChromeSize }
   | { kind: "statusSize"; size: StatusSize }
   | { kind: "statusFaded"; faded: boolean }
+  | { kind: "frozenRows"; rows: number }
   | { kind: "fontScale"; step: number }
   | { kind: "align"; placement: Placement }
   | { kind: "hide" }
@@ -43,6 +44,8 @@ type Props = {
   statusSize: StatusSize;
   /** 当前是否用更淡的一档颜色，勾选状态从这里来。 */
   statusFaded: boolean;
+  /** 当前冻结的正文行数。 */
+  frozenRows: number;
   onAction: (action: NoteMenuAction) => void;
 };
 
@@ -52,7 +55,7 @@ type Props = {
  *
  * 原生菜单只能放文字，所以底纹、对齐和外观各自收进子菜单，选中态用对勾表示。
  */
-export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, onAction }: Props) {
+export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, frozenRows, onAction }: Props) {
   async function popup(at: LogicalPosition) {
     const menu = await Menu.new({
       items: [
@@ -97,9 +100,10 @@ export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, onActio
             await MenuItem.new({ text: "界面", enabled: false }),
             await MenuItem.new({
               text: "放大",
-              // 没有 "Plus" 这个键：muda 只认 Equal/Digit/NumpadAdd，解析失败会被
-              // tauri 静默丢成 None —— 菜单照开，就是没有快捷键注释。
-              accelerator: "CmdOrCtrl+Shift+=",
+              // 没有 "Plus" 这个键：muda 的键表里只有 Equal/Minus/Digit，写 Plus 会被
+              // tauri 静默丢成 None —— 菜单照开，就是没有快捷键注释。所以绑 = 键，
+              // 和「缩小」的 - 对称；按住 Shift 打出的 + 也由这一档接住。
+              accelerator: "CmdOrCtrl+=",
               action: () => onAction({ kind: "fontScale", step: 1 }),
             }),
             await MenuItem.new({
@@ -113,7 +117,7 @@ export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, onActio
               action: () => onAction({ kind: "fontScale", step: 0 }),
             }),
             await PredefinedMenuItem.new({ item: "Separator" }),
-            await MenuItem.new({ text: "信息", enabled: false }),
+            await MenuItem.new({ text: "字符统计", enabled: false }),
             ...(await Promise.all(
               STATUS_SIZES.map((size) =>
                 CheckMenuItem.new({
@@ -130,7 +134,13 @@ export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, onActio
             }),
           ],
         }),
-        await PredefinedMenuItem.new({ item: "Separator" }),
+            await CheckMenuItem.new({
+              text: "冻结首行",
+              checked: frozenRows > 0,
+              action: () => onAction({ kind: "frozenRows", rows: frozenRows > 0 ? 0 : 1 }),
+            }),
+            await PredefinedMenuItem.new({ item: "Separator" }),
+        
         await MenuItem.new({
           text: "隐藏便签",
           action: () => onAction({ kind: "hide" }),

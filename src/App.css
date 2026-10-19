@@ -184,6 +184,11 @@ body {
   /* 脊条色由纸色压深一档得到：色卡只给了纸色，没有配套的深色档。
      80% 纸 + 20% #3b332e 与上一版手挑的 300 档深浅相当。 */
   --note-spine: color-mix(in srgb, var(--note-paper) 80%, #3b332e);
+  /* 置顶图标的红不在纸色系里，深浅两张纸各要一档才都看得清：
+     混进当前纸上的正文色，浅纸自动偏暗、深纸自动偏亮。 */
+  --note-pin: color-mix(in srgb, #d43d33 70%, var(--note-ink));
+  /* 选中色块下面的圆点：绿混进当前纸的正文色，浅纸偏深、深纸偏亮。 */
+  --note-dot: color-mix(in srgb, #22c55e 50%, var(--note-ink));
   background: var(--note-paper);
   color: var(--note-ink);
 }
@@ -235,6 +240,13 @@ body {
   --note-line: rgb(242 240 236 / 22%);
   --note-grid-line: rgb(242 240 236 / 12%);
   --note-on-spine: var(--note-ink);
+}
+
+/* 深色纸上同一支红要更亮：这两档的脊条比浅纸的脊条还深，暗红落上去只有 2:1，
+   图钉等于隐形；换成浅红后是 3.5~5.6:1。 */
+.note[data-paper="charcoalBlue"],
+.note[data-paper="pineBlue"] {
+  --note-pin: color-mix(in srgb, #ff7a6b 60%, var(--note-ink));
 }
 .note[data-paper="verdigris"] {
   --note-paper: var(--paper-verdigris);

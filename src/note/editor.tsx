@@ -1,3 +1,4 @@
+import { TextSelection } from "@tiptap/pm/state";
 import {
   Editor,
   EditorContent,
@@ -31,11 +32,14 @@ import {
   Undo2,
   type LucideIcon,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 import type { NoteContent, StatusSize } from "./document";
 import { NoteImage } from "./image";
 import { ScrollArrows, useScrollEdges } from "./ScrollStrip";
+import { FencedParagraph } from "./fenced-paragraph";
 import { PlainTextPaste } from "./plain-text-paste";
+import { applyFrozenTops, frozenTops } from "./frozen-rows";
 /**
  * 块级命令执行前先确保编辑器有焦点。
  *
@@ -97,15 +101,101 @@ export const TabIndent = Extension.create({
   },
 });
 
+/**
+ * Alt+↑/↓ 把光标所在的块和上／下一块换位置。
+ *
+ * 这不是 Markdown 的能力：CommonMark 只规定文本怎么写能标记成结构，编辑器怎么挪内容
+ * 不归它管；它属于编辑器功能，VS Code / IntelliJ 里叫 Move Line Up / Down。
+ *
+ * 搬的是最外层的块：光标在列表或引用里时整块一起走，不会只挪里面的一项。
+ */
+export const MoveBlock = Extension.create({
+  name: "moveBlock",
+
+  addKeyboardShortcuts() {
+    return {
+      "Alt-ArrowUp": () => moveLine(this.editor, -1),
+      "Alt-ArrowDown": () => moveLine(this.editor, 1),
+    };
+  },
+});
+
+function moveLine(editor: Editor, step: -1 | 1): boolean {
+  const { state } = editor;
+  const { $from, empty } = state.selection;
+  if (!empty || $from.depth < 1) return false;
+
+  // 段落里若含换行，把「当前行」（换行分隔的单行）当作移动单位，
+  // 而不是把整段一起搬走：段落边界含糊，单行边界清晰。
+  const parent = $from.parent;
+  if (parent.type.name === "paragraph") {
+    const text = parent.textContent;
+    if (text.includes("\n")) {
+      const lines = text.split("\n");
+      // 找出光标落在第几行
+      const offset = $from.parentOffset;
+      let lineIdx = 0;
+      let acc = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i] ?? "";
+        if (offset <= acc + line.length) { lineIdx = i; break; }
+        acc += line.length + 1;
+        if (i === lines.length - 1) lineIdx = i;
+      }
+      const target = lineIdx + step;
+      if (target < 0 || target >= lines.length) return true; // 吃掉按键
+      const cursorWithin = offset - ((): number => {
+        let s = 0;
+        for (let i = 0; i < lineIdx; i++) s += (lines[i]?.length ?? 0) + 1;
+        return s;
+      })();
+      // 交换两行
+      const next = [...lines];
+      [next[lineIdx], next[target]] = [next[target], next[lineIdx]];
+      const newText = next.join("\n");
+      const before = $from.before();
+      const marks = parent.firstChild?.marks ?? null;
+      const newPara = parent.type.create(parent.attrs, state.schema.text(newText, marks ?? undefined));
+      const tr = state.tr.replaceWith(before, before + parent.nodeSize, newPara);
+      // 光标跟着自己那行落到新位置
+      let newLineStart = 0;
+      for (let i = 0; i < target; i++) newLineStart += (next[i]?.length ?? 0) + 1;
+      const newOffset = Math.min(newLineStart + cursorWithin, newText.length);
+      tr.setSelection(TextSelection.create(tr.doc, before + 1 + newOffset));
+      editor.view.dispatch(tr);
+      return true;
+    }
+  }
+
+  // 无换行：按块移动（原行为）。
+  const docParent = $from.node(0);
+  const index = $from.index(0);
+  const target = index + step;
+  if (target < 0 || target >= docParent.childCount) return true;
+  const node = docParent.child(index);
+  const sibling = docParent.child(target);
+  const at = $from.before(1);
+  const start = step < 0 ? at - sibling.nodeSize : at;
+  const swapped = step < 0 ? [node, sibling] : [sibling, node];
+  const offset = $from.pos - at;
+  const moved = step < 0 ? start : start + sibling.nodeSize;
+  const tr = state.tr.replaceWith(start, start + node.nodeSize + sibling.nodeSize, swapped);
+  tr.setSelection(TextSelection.near(tr.doc.resolve(moved + offset)));
+  editor.view.dispatch(tr);
+  return true;
+}
+
 const extensions = [
   StarterKit,
   TableKit,
   Markdown.configure({ markedOptions: { gfm: true } }),
   NoteImage,
   PlainTextPaste,
+  FencedParagraph,
   // 对齐落在段落和标题上：列表和引用本身有自己的排版，不给它们加对齐。
   TextAlign.configure({ types: ["paragraph", "heading"] }),
   TabIndent,
+  MoveBlock,
 ];
 
 
@@ -356,12 +446,52 @@ function ToolbarButton({
 }
 
 /** 正文区域。单栏铺满剩余高度，不为工具行预留空间。 */
-export function NoteBody({ editor }: { editor: Editor | null }) {
+export function NoteBody({ editor, frozenRows }: { editor: Editor | null; frozenRows: number }) {
+  const box = useRef<HTMLDivElement>(null);
+
+  /**
+   * 冻结行的钉住高度只能量：CSS 不知道每行有多高，换行、字号、窗口宽度都会改。
+   *
+   * 量之前必须先把 sticky 摘掉：粘住的行 offsetTop 读出来是「钉住之后的位置」，
+   * 照它算只会把上一轮的结果抄一遍，越量越偏。摘掉后各行共享同一个 offsetParent，
+   * 滚动带来的那点偏移在相减时自己抵消，所以滚着量也准。
+   */
+  useEffect(() => {
+    const target = box.current;
+    const wrap = target?.querySelector(".ProseMirror") ?? null;
+    const shell = target?.closest<HTMLElement>(".note") ?? null;
+    if (!target || !wrap || !shell || !editor || frozenRows === 0) return;
+
+    const measure = () => {
+      const rows = Array.from(wrap.children).slice(0, frozenRows);
+      const frozen = shell.getAttribute("data-frozen-rows");
+      shell.setAttribute("data-frozen-rows", "0");
+      const wrapRect = wrap.getBoundingClientRect();
+      const tops = frozenTops(
+        rows.map((row) => (row as HTMLElement).getBoundingClientRect().top - wrapRect.top + wrap.scrollTop),
+      );
+      shell.setAttribute("data-frozen-rows", frozen ?? String(frozenRows));
+      applyFrozenTops(target, tops);
+    };
+
+    measure();
+    // 文档一变就重量：块的增删改会换掉 DOM 节点，盯节点的观察器会失效。
+    editor.on("transaction", measure);
+    // 正文换了行、字号或窗口尺寸变了，也走这条路；两边都会重算，重复一次不影响结果。
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrap);
+    return () => {
+      editor.off("transaction", measure);
+      observer.disconnect();
+    };
+  }, [editor, frozenRows]);
+
   return (
     <EditorContent
+      ref={box}
       editor={editor}
       // 没有底部圆角：下面还压着一行字符数，圆角交给便签根节点统一收口。
-      className="note-body min-h-0 flex-1 overflow-auto px-3.5 pt-2.5 pb-4 outline-none"
+      className="note-body min-h-0 flex-1 overflow-auto px-3.5 mt-2.5 pb-4 outline-none"
     />
   );
 }

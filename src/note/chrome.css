@@ -64,6 +64,11 @@
   color: var(--note-ink);
 }
 
+/* 置顶的图钉要转一下，过渡写在图标上：transition 不跨元素继承。 */
+.note-action svg {
+  transition: transform 140ms ease-out;
+}
+
 /* 两个开关按钮的激活态，形状和底色一起变：
    线框图标 = 关，填实图标 = 开。只换底色的话在浅色纸上几乎看不出来。
    前景取 --note-on-spine 而不是纸色：深色纸上纸色比 --note-spine 还暗，
@@ -78,6 +83,16 @@
 .note-action[data-pinned="true"] svg,
 .note-action[data-on="true"] svg {
   fill: currentColor;
+}
+
+/* 置顶比别的开关多两层意思：图钉逆时针转 90°、针尖朝右，颜色换成红 ——
+   红不在纸色系里，一眼就能看出这张便签是钉住的。 */
+.note-action[data-pinned="true"] {
+  color: var(--note-pin);
+}
+
+.note-action[data-pinned="true"] svg {
+  transform: rotate(-90deg);
 }
 
 /* 工具栏 - 与脊条同高（默认 20px），贴在脊条下面。便签最窄能缩到 200px，
@@ -153,7 +168,9 @@
   gap: calc(2px * var(--chrome-scale));
   height: var(--chrome-h);
   padding: 0 calc(2px * var(--chrome-scale));
-  background: color-mix(in srgb, var(--note-paper) 32%, var(--note-spine));
+  /* 上下边距取同一个值。抽屉 20px 高、色块 14px，下方还要留出选中横线的位置，
+     剩下的边距就是 1px —— 再大就得缩小色块或加高这一栏。 */
+  padding: calc(1px * var(--chrome-scale)) calc(2px * var(--chrome-scale));
   border-bottom: 1px solid var(--note-line);
 }
 
@@ -175,6 +192,9 @@
   display: flex;
   gap: calc(4px * var(--chrome-scale));
   width: max-content;
+  /* 选中横线画在色块下方，这段空白就是它的位置：溢出色块的部分会被滚动区裁掉，
+     所以要留在滚动区里面。1px 空隙 + 2px 线。 */
+  padding-bottom: calc(3px * var(--chrome-scale));
 }
 
 /* 两组色板之间的竖线 */
@@ -233,6 +253,8 @@
 
 /* 色块项 - 圆角方块，选中用高亮色边框 */
 .paper-color-item {
+  /* 选中圆点相对色块定位 */
+  position: relative;
   width: var(--chrome-chip);
   height: var(--chrome-chip);
   padding: 0;
@@ -252,10 +274,18 @@
   outline-offset: 1px;
 }
 
-/* 选中态 - 高亮描边环。色块本身是浅色，白色对勾压在中间几乎看不见。 */
-.paper-color-item[data-state="checked"] {
-  outline: 2px solid rgb(0 122 255);
-  outline-offset: 1px;
+/* 选中态 - 色块下方的绿短横线。描边会盖住色块本身的颜色，而挑色的时候正需要
+   看清它，所以标记画在外面；线离开色块底边 1px。 */
+.paper-color-item[data-state="checked"]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(-3px * var(--chrome-scale));
+  width: calc(6px * var(--chrome-scale));
+  height: calc(2px * var(--chrome-scale));
+  margin-left: calc(-3px * var(--chrome-scale));
+  border-radius: calc(1px * var(--chrome-scale));
+  background: var(--note-dot);
 }
 
 .note .note-action:focus-visible {
@@ -315,7 +345,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .note .note-action {
+  .note .note-action,
+  .note .note-action svg {
     transition: none;
   }
 }
@@ -334,3 +365,63 @@
 .note[data-chrome-size="xlarge"] {
   --chrome-scale: 1.8;
 }
+
+/* 冻结正文前 N 行：滚动时固定在顶部。
+   第 k 行的 top 得等于前面 k-1 行的实际高度之和，而 CSS 不知道行高（换行、字号、
+   窗口宽度都会改），所以这个和由 frozen-rows.ts 量出来写进 --frozen-top-<k>。
+   变量还没写进来时退回 1.5em 的旧近似值，避免首帧跳一下。 */
+.note[data-frozen-rows="1"] .note-body .ProseMirror > :nth-child(1) { position: sticky; top: 0; margin-left: -0.875rem; margin-right: -0.875rem; padding-left: 0.875rem; padding-right: 0.875rem; background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="2"] .note-body .ProseMirror > :nth-child(1) { position: sticky; top: 0; margin-left: -0.875rem; margin-right: -0.875rem; padding-left: 0.875rem; padding-right: 0.875rem; background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="2"] .note-body .ProseMirror > :nth-child(2) { position: sticky; top: var(--frozen-top-2, calc(1 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="3"] .note-body .ProseMirror > :nth-child(1) { position: sticky; top: 0; margin-left: -0.875rem; margin-right: -0.875rem; padding-left: 0.875rem; padding-right: 0.875rem; background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="3"] .note-body .ProseMirror > :nth-child(2) { position: sticky; top: var(--frozen-top-2, calc(1 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="3"] .note-body .ProseMirror > :nth-child(3) { position: sticky; top: var(--frozen-top-3, calc(2 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="4"] .note-body .ProseMirror > :nth-child(1) { position: sticky; top: 0; margin-left: -0.875rem; margin-right: -0.875rem; padding-left: 0.875rem; padding-right: 0.875rem; background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="4"] .note-body .ProseMirror > :nth-child(2) { position: sticky; top: var(--frozen-top-2, calc(1 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="4"] .note-body .ProseMirror > :nth-child(3) { position: sticky; top: var(--frozen-top-3, calc(2 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="4"] .note-body .ProseMirror > :nth-child(4) { position: sticky; top: var(--frozen-top-4, calc(3 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="5"] .note-body .ProseMirror > :nth-child(1) { position: sticky; top: 0; margin-left: -0.875rem; margin-right: -0.875rem; padding-left: 0.875rem; padding-right: 0.875rem; background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="5"] .note-body .ProseMirror > :nth-child(2) { position: sticky; top: var(--frozen-top-2, calc(1 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="5"] .note-body .ProseMirror > :nth-child(3) { position: sticky; top: var(--frozen-top-3, calc(2 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="5"] .note-body .ProseMirror > :nth-child(4) { position: sticky; top: var(--frozen-top-4, calc(3 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="5"] .note-body .ProseMirror > :nth-child(5) { position: sticky; top: var(--frozen-top-5, calc(4 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="6"] .note-body .ProseMirror > :nth-child(1) { position: sticky; top: 0; margin-left: -0.875rem; margin-right: -0.875rem; padding-left: 0.875rem; padding-right: 0.875rem; background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="6"] .note-body .ProseMirror > :nth-child(2) { position: sticky; top: var(--frozen-top-2, calc(1 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="6"] .note-body .ProseMirror > :nth-child(3) { position: sticky; top: var(--frozen-top-3, calc(2 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="6"] .note-body .ProseMirror > :nth-child(4) { position: sticky; top: var(--frozen-top-4, calc(3 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="6"] .note-body .ProseMirror > :nth-child(5) { position: sticky; top: var(--frozen-top-5, calc(4 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="6"] .note-body .ProseMirror > :nth-child(6) { position: sticky; top: var(--frozen-top-6, calc(5 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="7"] .note-body .ProseMirror > :nth-child(1) { position: sticky; top: 0; margin-left: -0.875rem; margin-right: -0.875rem; padding-left: 0.875rem; padding-right: 0.875rem; background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="7"] .note-body .ProseMirror > :nth-child(2) { position: sticky; top: var(--frozen-top-2, calc(1 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="7"] .note-body .ProseMirror > :nth-child(3) { position: sticky; top: var(--frozen-top-3, calc(2 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="7"] .note-body .ProseMirror > :nth-child(4) { position: sticky; top: var(--frozen-top-4, calc(3 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="7"] .note-body .ProseMirror > :nth-child(5) { position: sticky; top: var(--frozen-top-5, calc(4 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="7"] .note-body .ProseMirror > :nth-child(6) { position: sticky; top: var(--frozen-top-6, calc(5 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="7"] .note-body .ProseMirror > :nth-child(7) { position: sticky; top: var(--frozen-top-7, calc(6 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="8"] .note-body .ProseMirror > :nth-child(1) { position: sticky; top: 0; margin-left: -0.875rem; margin-right: -0.875rem; padding-left: 0.875rem; padding-right: 0.875rem; background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="8"] .note-body .ProseMirror > :nth-child(2) { position: sticky; top: var(--frozen-top-2, calc(1 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="8"] .note-body .ProseMirror > :nth-child(3) { position: sticky; top: var(--frozen-top-3, calc(2 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="8"] .note-body .ProseMirror > :nth-child(4) { position: sticky; top: var(--frozen-top-4, calc(3 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="8"] .note-body .ProseMirror > :nth-child(5) { position: sticky; top: var(--frozen-top-5, calc(4 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="8"] .note-body .ProseMirror > :nth-child(6) { position: sticky; top: var(--frozen-top-6, calc(5 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="8"] .note-body .ProseMirror > :nth-child(7) { position: sticky; top: var(--frozen-top-7, calc(6 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="8"] .note-body .ProseMirror > :nth-child(8) { position: sticky; top: var(--frozen-top-8, calc(7 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="9"] .note-body .ProseMirror > :nth-child(1) { position: sticky; top: 0; margin-left: -0.875rem; margin-right: -0.875rem; padding-left: 0.875rem; padding-right: 0.875rem; background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="9"] .note-body .ProseMirror > :nth-child(2) { position: sticky; top: var(--frozen-top-2, calc(1 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="9"] .note-body .ProseMirror > :nth-child(3) { position: sticky; top: var(--frozen-top-3, calc(2 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="9"] .note-body .ProseMirror > :nth-child(4) { position: sticky; top: var(--frozen-top-4, calc(3 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="9"] .note-body .ProseMirror > :nth-child(5) { position: sticky; top: var(--frozen-top-5, calc(4 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="9"] .note-body .ProseMirror > :nth-child(6) { position: sticky; top: var(--frozen-top-6, calc(5 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="9"] .note-body .ProseMirror > :nth-child(7) { position: sticky; top: var(--frozen-top-7, calc(6 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="9"] .note-body .ProseMirror > :nth-child(8) { position: sticky; top: var(--frozen-top-8, calc(7 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="9"] .note-body .ProseMirror > :nth-child(9) { position: sticky; top: var(--frozen-top-9, calc(8 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="10"] .note-body .ProseMirror > :nth-child(1) { position: sticky; top: 0; margin-left: -0.875rem; margin-right: -0.875rem; padding-left: 0.875rem; padding-right: 0.875rem; background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="10"] .note-body .ProseMirror > :nth-child(2) { position: sticky; top: var(--frozen-top-2, calc(1 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="10"] .note-body .ProseMirror > :nth-child(3) { position: sticky; top: var(--frozen-top-3, calc(2 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="10"] .note-body .ProseMirror > :nth-child(4) { position: sticky; top: var(--frozen-top-4, calc(3 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="10"] .note-body .ProseMirror > :nth-child(5) { position: sticky; top: var(--frozen-top-5, calc(4 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="10"] .note-body .ProseMirror > :nth-child(6) { position: sticky; top: var(--frozen-top-6, calc(5 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="10"] .note-body .ProseMirror > :nth-child(7) { position: sticky; top: var(--frozen-top-7, calc(6 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="10"] .note-body .ProseMirror > :nth-child(8) { position: sticky; top: var(--frozen-top-8, calc(7 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="10"] .note-body .ProseMirror > :nth-child(9) { position: sticky; top: var(--frozen-top-9, calc(8 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }
+.note[data-frozen-rows="10"] .note-body .ProseMirror > :nth-child(10) { position: sticky; top: var(--frozen-top-10, calc(9 * 1.5em)); background: var(--note-paper); z-index: 2; padding-bottom: 12px; margin-bottom: 0; box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--note-ink) 20%, transparent); }

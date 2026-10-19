@@ -126,7 +126,7 @@ export const STATUS_SIZES = ["off", "small", "normal", "large"] as const;
 export type StatusSize = (typeof STATUS_SIZES)[number];
 
 export const STATUS_SIZE_LABELS: Record<StatusSize, string> = {
-  off: "off",
+  off: "不显示",
   small: "小",
   normal: "默认",
   large: "大",
@@ -175,6 +175,8 @@ export const noteSchema = z.object({
   fontSize: z.number().default(DEFAULT_FONT_SIZE),
   /** 是否显示 Markdown 工具栏。旧文档没有这个字段，按不显示处理。 */
   toolbar: z.boolean().default(false),
+  /** 冻结的正文行数：滚动时前 N 行固定在顶部。旧文档没有这个字段，按 0 处理。 */
+  frozenRows: z.number().int().min(0).max(20).default(0),
   pinned: z.boolean(),
   translucent: z.boolean(),
   collapsed: z.boolean(),

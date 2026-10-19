@@ -17,7 +17,7 @@ function Body({
   onChange?: (content: NoteContent) => void;
 }) {
   const editor = useNoteEditor(content, onChange, "p1");
-  return <NoteBody editor={editor} />;
+  return <NoteBody editor={editor} frozenRows={0} />;
 }
 
 
@@ -43,7 +43,12 @@ function disabled(el: HTMLElement): boolean {
   return (el as HTMLButtonElement).disabled;
 }
 
-/** 只挂一个编辑器，不渲染任何界面：按键和计数行为用不着看得见的东西。 */
+/**
+ * 挂一个真编辑器，并把编辑器交给测试。
+ *
+ * 必须渲染 NoteBody：没有 DOM 时 Tiptap 的 `editor.view` 只是个替身（走 dispatchTransaction），
+ * 在它上面设置选区不会生效 —— 测出来的光标行为是假的。
+ */
 function Harness({
   content,
   expose,
@@ -53,7 +58,7 @@ function Harness({
 }) {
   const editor = useNoteEditor(content, () => {}, "p1");
   expose(editor);
-  return null;
+  return <NoteBody editor={editor} frozenRows={0} />;
 }
 
 /** 工具栏挂在真实编辑器上，同时把编辑器交给测试。 */
@@ -410,6 +415,271 @@ describe("Tab 缩进", () => {
 
     editor.commands.keyboardShortcut("Shift-Tab");
     expect((editor.getJSON() as JSONContent).content?.[0].content).toHaveLength(2);
+  });
+});
+
+describe("Alt+方向键换块位置", () => {
+  const twoParagraphs = (): NoteContent => ({
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [{ type: "text", text: "第一段" }] },
+      { type: "paragraph", content: [{ type: "text", text: "第二段" }] },
+    ],
+  });
+
+  const texts = (editor: Editor) =>
+    ((editor.getJSON() as JSONContent).content ?? []).map((node) => node.content?.[0]?.text);
+
+  it("Alt+↑ 把当前块往上换一格", async () => {
+    const editor = await mount(twoParagraphs());
+
+    editor.commands.focus("end");
+    editor.commands.keyboardShortcut("Alt-ArrowUp");
+
+    expect(texts(editor)).toEqual(["第二段", "第一段"]);
+  });
+
+  it("Alt+↓ 把当前块往下换一格", async () => {
+    const editor = await mount(twoParagraphs());
+
+    editor.commands.focus("start");
+    editor.commands.keyboardShortcut("Alt-ArrowDown");
+
+    expect(texts(editor)).toEqual(["第二段", "第一段"]);
+  });
+
+  it("真实按键路径：按住 Alt 敲方向键走同一条路", async () => {
+    const editor = await mount(twoParagraphs());
+
+    editor.commands.focus("end");
+    fireEvent.keyDown(editor.view.dom, { key: "ArrowUp", altKey: true });
+
+    expect(texts(editor)).toEqual(["第二段", "第一段"]);
+  });
+
+  it("移动后光标留在自己那块里", async () => {
+    const editor = await mount(twoParagraphs());
+
+    // 光标停在第二段末尾
+    // 走真实 keydown：Tiptap 的 keyboardShortcut 命令会把选区丢掉，测不出光标落在哪
+    editor.commands.focus("end");
+    fireEvent.keyDown(editor.view.dom, { key: "ArrowUp", altKey: true });
+
+    const { $from } = editor.state.selection;
+    expect($from.parent.textContent).toBe("第二段");
+    expect($from.parentOffset).toBe(3);
+  });
+
+  it("往下移之后光标也留在同一块里", async () => {
+    const editor = await mount(twoParagraphs());
+
+    // 光标停在第一段中间
+    // 同上，用真实 keydown 才看得到光标
+    editor.commands.setTextSelection(2);
+    fireEvent.keyDown(editor.view.dom, { key: "ArrowDown", altKey: true });
+
+    const { $from } = editor.state.selection;
+    expect($from.parent.textContent).toBe("第一段");
+    expect($from.parentOffset).toBe(1);
+  });
+
+  it("首块上移、末块下移都原地不动", async () => {
+    const editor = await mount(twoParagraphs());
+    const before = editor.getJSON();
+
+    editor.commands.focus("start");
+    editor.commands.keyboardShortcut("Alt-ArrowUp");
+    editor.commands.focus("end");
+    editor.commands.keyboardShortcut("Alt-ArrowDown");
+
+    expect(editor.getJSON()).toEqual(before);
+  });
+
+  it("列表里的块整张一起走，不会只挪一项", async () => {
+    const editor = await mount({
+      type: "doc",
+      content: [
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "甲" }] }],
+            },
+          ],
+        },
+        { type: "paragraph", content: [{ type: "text", text: "尾段" }] },
+      ],
+    });
+
+    // 光标落在列表项的段落里，搬的仍是整张列表
+    editor.commands.setTextSelection(3);
+    editor.commands.keyboardShortcut("Alt-ArrowDown");
+
+    const blocks = (editor.getJSON() as JSONContent).content ?? [];
+    // 末尾那个空段落是 StarterKit 的 TrailingNode 补的，只看前面两块
+    expect(blocks.map((node) => node.type).slice(0, 2)).toEqual(["paragraph", "bulletList"]);
+  });
+});
+
+describe("围栏代码块", () => {
+  const para = (value: string): NoteContent => ({
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text: value }] }],
+  });
+
+  it("围栏行回车变成代码块，语言跟着带进去", async () => {
+    const editor = await mount(para("```ts"));
+    // 用户是把这行写完才敲的回车
+    editor.commands.focus("end");
+
+    fireEvent.keyDown(editor.view.dom, { key: "Enter" });
+
+    const block = (editor.getJSON() as JSONContent).content?.[0];
+    expect(block?.type).toBe("codeBlock");
+    expect(block?.attrs?.language).toBe("ts");
+    // 围栏本身不该留在代码块里当第一行
+    expect(editor.getText().trim()).toBe("");
+  });
+
+  it("段落里只有半截围栏时照旧分段", async () => {
+    const editor = await mount(para("先说 ``` 再回车"));
+    editor.commands.focus("end");
+
+    fireEvent.keyDown(editor.view.dom, { key: "Enter" });
+
+    const doc = (editor.getJSON() as JSONContent).content ?? [];
+    expect(doc[0]?.type).toBe("paragraph");
+    expect(doc).toHaveLength(2);
+  });
+
+  it("单行围栏粘进来也变成代码块", async () => {
+    const { container } = render(<Body content={empty()} />);
+    const editable = container.querySelector(".ProseMirror") as HTMLElement;
+
+    paste(editable, "```内容```");
+
+    await waitFor(() => expect(container.querySelector("pre")).not.toBeNull());
+    expect(container.querySelector("pre")?.textContent).toBe("内容");
+  });
+
+  it("文本先写好、围栏后补上也变成代码块", async () => {
+    const editor = await mount(para("要点"));
+
+    // 先补结尾围栏，再回到开头补开始围栏，两种顺序都得认
+    editor.view.dispatch(editor.state.tr.insertText("```", 3));
+    editor.view.dispatch(editor.state.tr.insertText("```", 1));
+
+    const block = (editor.getJSON() as JSONContent).content?.[0];
+    expect(block?.type).toBe("codeBlock");
+    expect(block?.content?.[0]?.text).toBe("要点");
+  });
+
+  it("围栏里的英文算正文，不当语言吃掉", async () => {
+    const editor = await mount(empty());
+
+    editor.commands.insertContent({
+      type: "paragraph",
+      content: [{ type: "text", text: "```const a = 1```" }],
+    });
+
+    const block = (editor.getJSON() as JSONContent).content?.[0];
+    expect(block?.type).toBe("codeBlock");
+    expect(block?.content?.[0]?.text).toBe("const a = 1");
+  });
+
+  it("一次插入两段围栏，两段都换成代码块", async () => {
+    const editor = await mount(empty());
+
+    editor.commands.insertContent([
+      { type: "paragraph", content: [{ type: "text", text: "```甲```" }] },
+      { type: "paragraph", content: [{ type: "text", text: "```乙```" }] },
+    ]);
+
+    const blocks = (editor.getJSON() as JSONContent).content ?? [];
+    // 末尾那个空段落是 StarterKit 的 TrailingNode 补的，这里只看这两段
+    expect(blocks.map((node) => node.type).slice(0, 2)).toEqual(["codeBlock", "codeBlock"]);
+  });
+
+  it("列表项里补围栏不会破坏列表结构", async () => {
+    const editor = await mount({
+      type: "doc",
+      content: [
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [
+                { type: "paragraph", content: [{ type: "text", text: "```内容```" }] },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    // 在文档末尾另插一段围栏把事务带起来；列表里那一段的文本没被动过，仍然匹配
+    editor.commands.insertContentAt(editor.state.doc.content.size, {
+      type: "paragraph",
+      content: [{ type: "text", text: "```甲```" }],
+    });
+
+    const blocks = (editor.getJSON() as JSONContent).content ?? [];
+    const list = blocks[0];
+    const item = list?.content?.[0];
+    expect(list?.type).toBe("bulletList");
+    expect(item?.content?.[0].type).toBe("paragraph");
+    expect(item?.content?.[0].content?.[0]?.text).toBe("```内容```");
+    // 顶层那一段照常换成代码块，说明这一轮事务确实跑过
+    expect(blocks[1]?.type).toBe("codeBlock");
+  });
+
+  it("逐字敲出围栏行再回车也变成代码块", async () => {
+    const editor = await mount(empty());
+
+    // 走真实打字路径：输入规则要按「已经敲进去的文本」判断，逐字喂才作数
+    for (const char of "```js") {
+      const { from, to } = editor.state.selection;
+      const insert = () => editor.state.tr.insertText(char, from, to);
+      const handled = editor.view.someProp("handleTextInput", (handler) =>
+        handler(editor.view, from, to, char, insert),
+      );
+      // 没有规则接手时浏览器会自己把这个字插进去，这里补上同样的效果
+      if (!handled) editor.view.dispatch(insert());
+    }
+    fireEvent.keyDown(editor.view.dom, { key: "Enter" });
+
+    const block = (editor.getJSON() as JSONContent).content?.[0];
+    expect(block?.type).toBe("codeBlock");
+    expect(block?.attrs?.language).toBe("js");
+  });
+
+  it("列表项里回车分出一项，不会变成代码块", async () => {
+    const editor = await mount({
+      type: "doc",
+      content: [
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [
+                { type: "paragraph", content: [{ type: "text", text: "```ts" }] },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    editor.commands.focus("end");
+    fireEvent.keyDown(editor.view.dom, { key: "Enter" });
+
+    // 列表里回车是「分出一项」，围栏不该在这里被当成代码块
+    const list = (editor.getJSON() as JSONContent).content?.[0];
+    expect(list?.content).toHaveLength(2);
+    expect(list?.content?.[0].content?.[0].type).toBe("paragraph");
+    expect(list?.content?.[1].content?.[0].type).toBe("paragraph");
   });
 });
 

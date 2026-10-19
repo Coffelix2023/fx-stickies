@@ -54,6 +54,12 @@ vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     label: "n1",
     startDragging: () => invoke("plugin:window|start_dragging", { label: "n1" }),
+    // 中键拖动不问 AppKit，自己读起点位置再设位置，所以这三个替身也要有。
+    outerPosition: () =>
+      Promise.resolve({ x: 100, y: 200, toLogical: (scale: number) => ({ x: 100 / scale, y: 200 / scale }) }),
+    scaleFactor: () => Promise.resolve(1),
+    setPosition: (at: { x: number; y: number }) =>
+      invoke("plugin:window|set_position", { label: "n1", x: at.x, y: at.y }),
   }),
 }));
 
@@ -100,6 +106,7 @@ function note(): Note {
     pattern: "dots",
     fontSize: 14,
     toolbar: false,
+    frozenRows: 0,
     pinned: false,
     translucent: false,
     collapsed: false,
@@ -145,6 +152,7 @@ afterEach(() => {
   confirmDialog.mockReset();
   lastMenu = [];
   poppedAt = null;
+  vi.unstubAllGlobals();
 });
 
 describe("便签外观", () => {
@@ -310,13 +318,13 @@ describe("脊条", () => {
     fireEvent.pointerUp(window, { button: 0, clientX: 10, clientY: 10 });
     // 抖动两像素也还是点击
     fireEvent.pointerDown(drag, { button: 0, clientX: 10, clientY: 10 });
-    fireEvent.pointerMove(window, { clientX: 12, clientY: 11 });
+    fireEvent.pointerMove(window, { clientX: 12, clientY: 11, buttons: 1 });
     fireEvent.pointerUp(window, { button: 0, clientX: 12, clientY: 11 });
     expect(dragCalls()).toBe(0);
 
     // 拖动：过阈值才交给窗口层
     fireEvent.pointerDown(drag, { button: 0, clientX: 10, clientY: 10 });
-    fireEvent.pointerMove(window, { clientX: 40, clientY: 10 });
+    fireEvent.pointerMove(window, { clientX: 40, clientY: 10, buttons: 1 });
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith("plugin:window|start_dragging", {
         label: "n1",
@@ -335,11 +343,106 @@ describe("脊条", () => {
     expect(invoke.mock.calls.filter(([name]) => name === "toggle_maximize")).toHaveLength(1);
   });
 
-  it("置顶的图标形状随状态变，线框和填实分得清", () => {
+  it("中键在整张便签上都能拖窗口，左键在正文里不行", async () => {
+    const { container } = renderWindow(note());
+    await loaded();
+
+    const dragCalls = () =>
+      invoke.mock.calls.filter(([name]) => name === "plugin:window|start_dragging").length;
+    const moves = () =>
+      invoke.mock.calls.filter(([name]) => name === "plugin:window|set_position");
+    const body = container.querySelector(".note-body") as HTMLElement;
+
+    // 左键在正文里按下再滑动：正文不是拖动区，窗口不动。
+    fireEvent.pointerDown(body, { button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(window, { clientX: 60, clientY: 10, buttons: 1 });
+    fireEvent.pointerUp(window, { button: 0, clientX: 60, clientY: 10 });
+    expect(dragCalls()).toBe(0);
+    expect(moves()).toHaveLength(0);
+
+    // 起点位置是异步读的，等它落地再动，否则这一步会被当成还没准备好。
+    const primed = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+    // 中键按住后按钮位丢了（在窗口外松的键）：不拖，只把监听收掉。
+    fireEvent.pointerDown(body, { button: 1, screenX: 10, screenY: 10 });
+    await primed();
+    fireEvent.pointerMove(window, { screenX: 60, screenY: 10, buttons: 0 });
+    await primed();
+    expect(moves()).toHaveLength(0);
+
+    // 中键按下再滑动：响应区是整张便签，正文里也算；位置自己设，不走原生拖拽。
+    fireEvent.pointerDown(body, { button: 1, screenX: 10, screenY: 10 });
+    await primed();
+    fireEvent.pointerMove(window, { screenX: 60, screenY: 10, buttons: 4 });
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("plugin:window|set_position", {
+        label: "n1",
+        x: 150,
+        y: 200,
+      }),
+    );
+    fireEvent.pointerUp(window, { button: 1, screenX: 60, screenY: 10 });
+    expect(dragCalls()).toBe(0);
+    // 起点还没读回来就松手：迟到的起点不能复活一次已经结束的拖动。
+    invoke.mockClear();
+    fireEvent.pointerDown(body, { button: 1, screenX: 10, screenY: 10 });
+    fireEvent.pointerUp(window, { button: 1, screenX: 10, screenY: 10 });
+    await primed();
+    fireEvent.pointerMove(window, { screenX: 60, screenY: 10, buttons: 4 });
+    await primed();
+    expect(moves()).toHaveLength(0);
+
+    // 位移还没落帧就松手：最后一段要补上，窗口不能停在半路。
+    fireEvent.pointerDown(body, { button: 1, screenX: 10, screenY: 10 });
+    await primed();
+    fireEvent.pointerMove(window, { screenX: 40, screenY: 30, buttons: 4 });
+    fireEvent.pointerUp(window, { button: 1, screenX: 40, screenY: 30 });
+    expect(invoke).toHaveBeenCalledWith("plugin:window|set_position", {
+      label: "n1",
+      x: 130,
+      y: 220,
+    });
+  });
+
+  it("置顶的图标形状、朝向和颜色都跟着状态变", () => {
     const css = readFileSync("src/note/chrome.css", "utf8");
     // 只换底色在浅色纸上几乎看不出来，所以图标还要从线框变实心
     expect(css).toMatch(/\.note-action\[data-pinned="true"\] svg[^{]*\{[^}]*fill: currentColor/);
+    // 置顶再多两层：图钉逆时针转 90°（针尖朝右），颜色换成红
+    expect(css).toMatch(/\.note-action\[data-pinned="true"\][^{]*\{[^}]*color: var\(--note-pin\)/);
+    expect(css).toMatch(
+      /\.note-action\[data-pinned="true"\] svg[^{]*\{[^}]*transform: rotate\(-90deg\)/,
+    );
 
+    // 红跟着纸色深浅走：定义在 .note 上，混进当前纸的正文色
+    const app = readFileSync("src/App.css", "utf8");
+    expect(app).toMatch(/\.note \{[^}]*--note-pin:[^;]*var\(--note-ink\)/);
+    // 深色纸上换成更亮的一档，暗红落在炭蓝/松蓝的脊条上只有 2:1
+    expect(app).toMatch(/\[data-paper="pineBlue"\][^{]*\{[^}]*--note-pin/);
+  });
+
+  it("选中的色块用下方的绿短横线标出来", () => {
+    const css = readFileSync("src/note/chrome.css", "utf8");
+    // 描边会盖住色块本身的颜色，标记改画在色块下面
+    expect(css).toMatch(
+      /\.paper-color-item\[data-state="checked"\]::after[^{]*\{[^}]*background: var\(--note-dot\)/,
+    );
+    // 是一条横线，不是圆点
+    expect(css).toMatch(
+      /\.paper-color-item\[data-state="checked"\]::after[^{]*\{[^}]*width: calc\(6px \* var\(--chrome-scale\)\)/,
+    );
+    // 横线画在色块下方：滚动区要留出放它的位置，抽屉底边也要留缝
+    expect(css).toMatch(
+      /\.paper-color-grid \{[^}]*padding-bottom: calc\(3px \* var\(--chrome-scale\)\)/,
+    );
+    // 上下边距取同一个值
+    expect(css).toMatch(
+      /\.note-paper-drawer \{[^}]*padding: calc\(1px \* var\(--chrome-scale\)\) calc\(2px \* var\(--chrome-scale\)\)/,
+    );
+
+    // 绿也跟着纸色深浅走
+    const app = readFileSync("src/App.css", "utf8");
+    expect(app).toMatch(/--note-dot: color-mix\([^;]*var\(--note-ink\)\)/);
   });
   it("深色纸上正文切成浅色，选区再反回来", () => {
     const app = readFileSync("src/App.css", "utf8");
@@ -502,18 +605,19 @@ describe("原生菜单", () => {
       "放大",
       "缩小",
       "重置",
-      "信息",
-      // 两组选项同名（小/默认/大），顺序断言足以定位，选中态在下面的信息组测试里查。
-      "off",
+      "字符统计",
+      // 两组选项同名（小/默认/大），顺序断言足以定位，选中态在下面的字符统计组测试里查。
+      "不显示",
       "小",
       "默认",
       "大",
       "半透明",
+      
     ]);
     // 标签是禁用项，点了没反应，也不该再有下级。
     expect(menuItem("标题栏").enabled).toBe(false);
     expect(menuItem("标题栏").items).toBeUndefined();
-    // 标题栏组在信息组之前，同名选项靠位置区分：「大」是外观列表里的第 4 项。
+    // 标题栏组在字符统计组之前，同名选项靠位置区分：「大」是外观列表里的第 4 项。
     const lookItems = (menuItem("外观").items ?? []).filter(
       (entry) => typeof entry.text === "string",
     );
@@ -522,14 +626,14 @@ describe("原生菜单", () => {
     expect(lookItems[2]?.checked).toBe(false);
 
     // "=" 而不是 "+"：muda 里没有 Plus 这个键，写成 Plus 会被静默丢掉。
-    expect(menuItem("放大").accelerator).toBe("CmdOrCtrl+Shift+=");
+    expect(menuItem("放大").accelerator).toBe("CmdOrCtrl+=");
     expect(menuItem("缩小").accelerator).toBe("CmdOrCtrl+-");
     expect(menuItem("重置").accelerator).toBe("CmdOrCtrl+0");
     expect(menuItem("隐藏便签")).toBeTruthy();
     expect(menuItem("删除便签…")).toBeTruthy();
   });
 
-  it("信息组是标签加四档，当前档位打勾", async () => {
+  it("字符统计组是标签加四档，当前档位打勾", async () => {
     renderWindow({ ...note(), statusSize: "large" });
     await loaded();
 
@@ -539,15 +643,15 @@ describe("原生菜单", () => {
     const entries = (menuItem("外观").items ?? []).filter(
       (entry) => typeof entry.text === "string",
     );
-    const label = entries.find((entry) => entry.text === "信息");
+    const label = entries.find((entry) => entry.text === "字符统计");
     expect(label?.enabled).toBe(false);
     expect(label?.items).toBeUndefined();
 
-    // 「信息」之后是那四档，再加一个独立的「半透明」勾选项。
+    // 「字符统计」之后是那四档，再加一个独立的「半透明」勾选项。
     const after = entries.slice(entries.indexOf(label as MenuItemLike) + 1);
-    expect(after.map((entry) => entry.text)).toEqual(["off", "小", "默认", "大", "半透明"]);
+    expect(after.map((entry) => entry.text)).toEqual(["不显示", "小", "默认", "大", "半透明"]);
     expect(after.find((entry) => entry.text === "大")?.checked).toBe(true);
-    expect(after.find((entry) => entry.text === "off")?.checked).toBe(false);
+    expect(after.find((entry) => entry.text === "不显示")?.checked).toBe(false);
     // 半透明默认勾选：它是辅助信息，不该和正文抢注意力。
     const faded = after.find((entry) => entry.text === "半透明");
     expect(faded?.checked).toBe(true);
@@ -586,11 +690,11 @@ describe("菜单动作", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
     await waitFor(() => expect(lastMenu.length).toBeGreaterThan(0));
-    // 「大」在标题栏和信息组各有一个，这里点信息组那个：它在「信息」标签之后。
+    // 「大」在标题栏和字符统计组各有一个，这里点字符统计组那个：它在「字符统计」标签之后。
     const look = (menuItem("外观").items ?? []).filter(
       (entry) => typeof entry.text === "string",
     );
-    const infoAt = look.findIndex((entry) => entry.text === "信息");
+    const infoAt = look.findIndex((entry) => entry.text === "字符统计");
     look.slice(infoAt + 1).find((entry) => entry.text === "大")?.action?.();
 
     await waitFor(() =>
@@ -671,5 +775,39 @@ describe("菜单动作", () => {
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith("delete_note", { id: "n1" }),
     );
+  });
+});
+
+describe("冻结行数", () => {
+  /** jsdom 没有 ResizeObserver，补个空壳；这个用例只验接线，不验布局。 */
+  class StubResizeObserver {
+    observe() {}
+    disconnect() {}
+  }
+
+  it("量完把 data-frozen-rows 装回去，并把偏移写成变量", async () => {
+    vi.stubGlobal("ResizeObserver", StubResizeObserver);
+    const threeBlocks = {
+      ...note(),
+      frozenRows: 3,
+      content: {
+        p1: {
+          type: "doc",
+          content: ["一", "二", "三"].map((text) => ({
+            type: "paragraph",
+            content: [{ type: "text", text }],
+          })),
+        },
+      },
+    };
+    const { container } = renderWindow(threeBlocks);
+    await loaded();
+
+    const body = container.querySelector(".note-body") as HTMLElement;
+    // jsdom 量不到行高（offsetTop 恒为 0），这里只确认偏移确实写出了变量。
+    await waitFor(() => expect(body.style.getPropertyValue("--frozen-top-3")).toBe("0px"));
+    expect(body.style.getPropertyValue("--frozen-top-2")).toBe("0px");
+    // 测量前会临时把属性改成 0 摘掉 sticky；量完忘了装回去，冻结就被静默关掉了。
+    expect(container.querySelector(".note")?.getAttribute("data-frozen-rows")).toBe("3");
   });
 });

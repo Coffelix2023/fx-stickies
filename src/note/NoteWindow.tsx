@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { NoteEditor } from "./NoteEditor";
 import { PaperDrawer } from "./PaperDrawer";
-import { NoteSpine } from "./NoteSpine";
+import { NoteSpine, startDragOnMiddleButton } from "./NoteSpine";
 import { type NoteMenuAction } from "./NoteMenu";
 import {
   type Note,
@@ -78,6 +78,8 @@ export function NoteWindow({ id }: { id: string }) {
       setNote((prev) => (prev ? { ...prev, statusSize: action.size } : prev));
     } else if (action.kind === "statusFaded") {
       setNote((prev) => (prev ? { ...prev, statusFaded: action.faded } : prev));
+    } else if (action.kind === "frozenRows") {
+      setNote((prev) => (prev ? { ...prev, frozenRows: action.rows } : prev));
     } else if (action.kind === "fontScale") {
       setNote((prev) =>
         prev ? { ...prev, fontSize: scaleFontSize(prev.fontSize, action.step) } : prev,
@@ -205,11 +207,15 @@ export function NoteWindow({ id }: { id: string }) {
 
   return (
     <div
+      // 中键按住拖整张便签。挂在根节点上，所以正文、抽屉都算拖动区；走捕获阶段，
+      // 免得正文里的编辑器先把这次按下吃掉。
+      onPointerDownCapture={startDragOnMiddleButton}
       className="note flex h-full min-h-0 flex-col rounded-b-[10px]"
       data-paper={note.paper}
       data-pattern={note.pattern}
       // 标题栏档位写在这里，chrome.css 据此缩放脊条、工具栏和色块行。
       data-chrome-size={note.chromeSize}
+      data-frozen-rows={note.frozenRows}
       // 字号挂在根上，正文和标题一起缩放；标题栏那组控件走上面的 chromeSize。
       style={{ fontSize: `${note.fontSize}px` }}
     >

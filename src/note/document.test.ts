@@ -25,6 +25,7 @@ function note(): Note {
     pattern: "plain",
     fontSize: DEFAULT_FONT_SIZE,
     toolbar: false,
+    frozenRows: 0,
     pinned: false,
     translucent: false,
     collapsed: false,

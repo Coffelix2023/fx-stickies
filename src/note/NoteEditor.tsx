@@ -23,7 +23,7 @@ export function NoteEditor({ note, onContentChange }: Props) {
     <div className="flex min-h-0 flex-1 flex-col">
       {/* 工具栏贴在脊条下面，正文自己缩到剩余高度。 */}
       {note.toolbar && <NoteToolbar editor={editor} />}
-      <NoteBody editor={editor} />
+      <NoteBody editor={editor} frozenRows={note.frozenRows} />
       <NoteStatus editor={editor} size={note.statusSize} faded={note.statusFaded} />
     </div>
   );

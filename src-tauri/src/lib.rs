@@ -731,7 +731,7 @@ mod tests {
         let area = Some(Rect::new(0.0, 25.0, 1920.0, 1055.0));
         let aligned = align_note_to(app.handle(), &dir, "n1", area, Placement::TopLeft).unwrap();
 
-        assert_eq!(aligned.frame, Rect::new(12.0, 37.0, 0.0, 0.0));
+        assert_eq!(aligned.frame, Rect::new(0.0, 25.0, 0.0, 0.0));
         assert_eq!(note::load(&dir, "n1").unwrap().frame, aligned.frame);
     }
 
