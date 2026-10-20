@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dmg": "tauri build && ./scripts/package-dmg.sh"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

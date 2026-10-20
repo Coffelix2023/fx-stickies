@@ -37,7 +37,7 @@ The macOS Stacks app cannot do WYSIWYG editing, pastes carry source styling, and
 
 这个包没有 Apple Developer ID 签名和公证（需要 99 美元/年的开发者账号），所以需要上面那一次手动放行。想要完整的「双击即开、无任何提示」，只能走签名 + 公证。
 
-从 0.2.1 起安装包带 bundle 级 ad-hoc 签名，`codesign --verify --deep --strict` 通过；更早的包签名是残缺的（`code has no resources but signature indicates they must be present`），这是「已损坏」提示的技术根因之一。
+从 0.2.1 起安装包带 bundle 级 ad-hoc 签名，`codesign --verify --deep --strict` 通过；更早的包签名是残缺的（`code has no resources but signature indicates they must be present`）。签名完整性与 Gatekeeper 提示类型相关，但跨机器实际提示尚未实测，因此本版本只承诺「签名缺陷已修，隔离标记可清理」，不承诺跨机提示的具体文案。
 
 ## 技术栈 Stack
 
@@ -64,7 +64,8 @@ cd src-tauri && cargo test   # Rust 测试 Rust tests
 打包 Build：
 
 ```bash
-pnpm tauri build
+pnpm dmg            # 构建 DMG 并把 run-fix.command 塞进去
+pnpm tauri build    # 只构建，产出的 DMG 里没有 run-fix.command
 ```
 
 ## 数据存储 Data
