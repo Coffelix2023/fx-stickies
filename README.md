@@ -27,6 +27,18 @@ The macOS Stacks app cannot do WYSIWYG editing, pastes carry source styling, and
 
 - **首次启动** — 没有便签时自动新建一张，底色默认浅杏，位置贴到光标所在屏左上
 - **导出便签** — 「更多操作 → 导出便签」支持 Markdown / 纯文本 / Word (.docx)
+## 安装 Install
+
+下载 `fx-stickies_<版本>_aarch64.dmg`，双击打开，然后**双击 `run-fix.command`**。脚本会自己把 app 装进 `/Applications`、解除 Gatekeeper（macOS 的启动安全网关）的隔离标记并启动它。
+
+首次双击 `run-fix.command` 如果被系统拦下（脚本本身没有开发者签名），打开 **系统设置 → 隐私与安全**，在底部点「仍要打开」，再回来双击一次。免费方案绕不过这道放行。
+
+不要直接把 `fx-stickies.app` 拖进 `/Applications`，拖拽会把隔离标记一起带过去，app 可能显示「已损坏」。已经拖了也没关系，再双击一次 `run-fix.command`，它会覆盖装好。
+
+这个包没有 Apple Developer ID 签名和公证（需要 99 美元/年的开发者账号），所以需要上面那一次手动放行。想要完整的「双击即开、无任何提示」，只能走签名 + 公证。
+
+从 0.2.1 起安装包带 bundle 级 ad-hoc 签名，`codesign --verify --deep --strict` 通过；更早的包签名是残缺的（`code has no resources but signature indicates they must be present`），这是「已损坏」提示的技术根因之一。
+
 ## 技术栈 Stack
 
 | 层 Layer | 技术 |
