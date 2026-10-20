@@ -7,6 +7,7 @@ import {
   Submenu,
 } from "@tauri-apps/api/menu";
 import { Ellipsis } from "lucide-react";
+import { enable as enableAutostart, disable as disableAutostart, isEnabled as autostartEnabled } from "@tauri-apps/plugin-autostart";
 
 import {
   PATTERN,
@@ -21,6 +22,9 @@ import {
   type Placement,
   type ChromeSize,
   type StatusSize,
+  LAYOUTS,
+  LAYOUT_LABELS,
+  type Layout,
 } from "./document";
 
 /** 菜单点完要做什么。原生菜单只管把动作报回来，动手的是便签窗口。 */
@@ -29,6 +33,7 @@ export type NoteMenuAction =
   | { kind: "chromeSize"; size: ChromeSize }
   | { kind: "statusSize"; size: StatusSize }
   | { kind: "statusFaded"; faded: boolean }
+  | { kind: "layout"; layout: Layout }
   | { kind: "frozenRows"; rows: number }
   | { kind: "export"; format: "markdown" | "text" | "docx" }
   | { kind: "fontScale"; step: number }
@@ -45,6 +50,8 @@ type Props = {
   statusSize: StatusSize;
   /** 当前是否用更淡的一档颜色，勾选状态从这里来。 */
   statusFaded: boolean;
+  /** 当前界面布局档位。 */
+  layout: Layout;
   /** 当前冻结的正文行数。 */
   frozenRows: number;
   onAction: (action: NoteMenuAction) => void;
@@ -56,8 +63,9 @@ type Props = {
  *
  * 原生菜单只能放文字，所以底纹、对齐和外观各自收进子菜单，选中态用对勾表示。
  */
-export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, frozenRows, onAction }: Props) {
+export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, layout, frozenRows, onAction }: Props) {
   async function popup(at: LogicalPosition) {
+    const autoStart = await autostartEnabled().catch(() => false);
     const menu = await Menu.new({
       items: [
         await Submenu.new({
@@ -118,6 +126,17 @@ export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, frozenR
               action: () => onAction({ kind: "fontScale", step: 0 }),
             }),
             await PredefinedMenuItem.new({ item: "Separator" }),
+            await MenuItem.new({ text: "布局", enabled: false }),
+            ...(await Promise.all(
+              LAYOUTS.map((value) =>
+                CheckMenuItem.new({
+                  text: LAYOUT_LABELS[value],
+                  checked: value === layout,
+                  action: () => onAction({ kind: "layout", layout: value }),
+                }),
+              ),
+            )),
+            await PredefinedMenuItem.new({ item: "Separator" }),
             await MenuItem.new({ text: "字符统计", enabled: false }),
             ...(await Promise.all(
               STATUS_SIZES.map((size) =>
@@ -141,7 +160,16 @@ export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, frozenR
               action: () => onAction({ kind: "frozenRows", rows: frozenRows > 0 ? 0 : 1 }),
             }),
             await PredefinedMenuItem.new({ item: "Separator" }),
-        
+            await CheckMenuItem.new({
+              text: "开机启动",
+              checked: autoStart,
+              action: () => {
+                if (autoStart) void disableAutostart();
+                else void enableAutostart();
+              },
+            }),
+            await PredefinedMenuItem.new({ item: "Separator" }),
+
         await MenuItem.new({
           text: "隐藏便签",
           action: () => onAction({ kind: "hide" }),

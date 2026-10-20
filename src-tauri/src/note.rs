@@ -93,6 +93,16 @@ pub enum StatusSize {
     Normal,
     Large,
 }
+/// 正文行高/行距档位：紧凑 / 默认 / 宽松。旧文档没有这个字段，按默认读进来。
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Layout {
+    Compact,
+    #[default]
+    Default,
+    Relaxed,
+}
+
 /// 一张便签的完整文档。字段与设计文档一致。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -129,6 +139,9 @@ pub struct Note {
     /// 字符统计是否用更淡的一档颜色。旧文档没有这个字段，按勾选读进来。
     #[serde(default = "status_faded_default")]
     pub status_faded: bool,
+    /// 正文行高/行距档位。旧文档没有这个字段，按默认档读进来。
+    #[serde(default)]
+    pub layout: Layout,
     pub frame: Rect,
     /// 折叠前保存的展开尺寸；未折叠时为 None。
     pub expanded_size: Option<Size>,
@@ -198,6 +211,7 @@ impl Note {
             chrome_size: ChromeSize::Normal,
             status_size: StatusSize::Normal,
             status_faded: true,
+            layout: Layout::Default,
             frame,
             expanded_size: None,
             maximized: false,

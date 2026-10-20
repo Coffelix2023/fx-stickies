@@ -218,6 +218,7 @@ export function NoteSpine({
         chromeSize={note.chromeSize}
         statusSize={note.statusSize}
         statusFaded={note.statusFaded}
+        layout={note.layout}
         frozenRows={note.frozenRows}
         onAction={onMenuAction}
       />

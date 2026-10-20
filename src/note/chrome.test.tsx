@@ -107,6 +107,7 @@ function note(): Note {
     fontSize: 14,
     toolbar: false,
     frozenRows: 0,
+      layout: "default",
     pinned: false,
     translucent: false,
     collapsed: false,
@@ -605,6 +606,10 @@ describe("原生菜单", () => {
       "放大",
       "缩小",
       "重置",
+      "布局",
+      "紧凑",
+      "默认",
+      "宽松",
       "字符统计",
       // 两组选项同名（小/默认/大），顺序断言足以定位，选中态在下面的字符统计组测试里查。
       "不显示",

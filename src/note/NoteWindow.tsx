@@ -151,8 +151,22 @@ export function NoteWindow({ id }: { id: string }) {
       setNote((prev) => (prev ? { ...prev, statusSize: action.size } : prev));
     } else if (action.kind === "statusFaded") {
       setNote((prev) => (prev ? { ...prev, statusFaded: action.faded } : prev));
+    } else if (action.kind === "layout") {
+      if (note) {
+        const next = { ...note, layout: action.layout };
+        lastSaved.current = next;
+        setNote(next);
+        void saveNow(next);
+      }
     } else if (action.kind === "frozenRows") {
-      setNote((prev) => (prev ? { ...prev, frozenRows: action.rows } : prev));
+      // 冻结行数是便签配置，切完立刻落盘，避免关窗时防抖还没触发而丢失状态。
+      if (note) {
+        const next = { ...note, frozenRows: action.rows };
+        // 避免防抖 effect 再写一次：乐观推进 lastSaved，落盘成功后再校正。
+        lastSaved.current = next;
+        setNote(next);
+        void saveNow(next);
+      }
     } else if (action.kind === "export") {
       void exportNote(note, action.format);
     } else if (action.kind === "fontScale") {
@@ -291,6 +305,7 @@ export function NoteWindow({ id }: { id: string }) {
       // 标题栏档位写在这里，chrome.css 据此缩放脊条、工具栏和色块行。
       data-chrome-size={note.chromeSize}
       data-frozen-rows={note.frozenRows}
+      data-layout={note.layout}
       // 字号挂在根上，正文和标题一起缩放；标题栏那组控件走上面的 chromeSize。
       style={{ fontSize: `${note.fontSize}px` }}
     >

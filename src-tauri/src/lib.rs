@@ -267,7 +267,8 @@ fn get_note<R: Runtime>(app: AppHandle<R>, id: String) -> Result<Note, String> {
 ///
 /// 位置、展开尺寸、可见性、折叠、置顶和层叠顺序由窗口层负责，前端手里这些字段
 /// 可能是旧的（刚拖动过、刚被托盘改过），所以一律保留磁盘上的值；
-/// 标题、分页、正文、底色、底纹和半透明以前端为准。
+/// 标题、分页、正文、底色、底纹、半透明、字号、工具栏、标题栏档位、字符统计、
+/// 半透明开关、冻结行数与界面布局以前端为准；窗口几何与置顶由窗口层写入，不被前端覆盖。
 fn merge_frontend_fields(stored: &Note, incoming: &Note) -> Note {
     Note {
         title: incoming.title.clone(),
@@ -277,6 +278,13 @@ fn merge_frontend_fields(stored: &Note, incoming: &Note) -> Note {
         paper: incoming.paper,
         pattern: incoming.pattern,
         translucent: incoming.translucent,
+        font_size: incoming.font_size,
+        toolbar: incoming.toolbar,
+        chrome_size: incoming.chrome_size,
+        status_size: incoming.status_size,
+        status_faded: incoming.status_faded,
+        frozen_rows: incoming.frozen_rows,
+        layout: incoming.layout,
         ..stored.clone()
     }
 }
@@ -583,6 +591,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .manage(FrameWrites::default())
         .invoke_handler(tauri::generate_handler![
             new_note,

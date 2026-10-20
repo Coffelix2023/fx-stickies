@@ -132,6 +132,15 @@ export const STATUS_SIZE_LABELS: Record<StatusSize, string> = {
   large: "大",
 };
 
+export const LAYOUTS = ["compact", "default", "relaxed"] as const;
+export type Layout = (typeof LAYOUTS)[number];
+
+export const LAYOUT_LABELS: Record<Layout, string> = {
+  compact: "紧凑",
+  default: "默认",
+  relaxed: "宽松",
+};
+
 /** 默认档是 12px；更早的便签没有这个字段，读进来也落到这一档。 */
 export const DEFAULT_STATUS_SIZE: StatusSize = "normal";
 
@@ -141,6 +150,7 @@ export const DEFAULT_STATUS_SIZE: StatusSize = "normal";
  */
 export const DEFAULT_STATUS_FADED = true;
 export const DEFAULT_CHROME_SIZE: ChromeSize = "normal";
+export const DEFAULT_LAYOUT: Layout = "default";
 
 const rectSchema = z.object({
   x: z.number(),
@@ -187,6 +197,8 @@ export const noteSchema = z.object({
   statusSize: z.enum(STATUS_SIZES).default(DEFAULT_STATUS_SIZE),
   /** 字符统计是否用更淡的一档颜色。旧文档没有这个字段，按勾选处理。 */
   statusFaded: z.boolean().default(DEFAULT_STATUS_FADED),
+  /** 正文行高/行距档位。旧文档没有这个字段，落回默认档。 */
+  layout: z.enum(LAYOUTS).default(DEFAULT_LAYOUT),
   frame: rectSchema,
   expandedSize: sizeSchema.nullable(),
   /** 是否处于放大态。窗口层负责改，前端只渲染状态不渲染它。 */

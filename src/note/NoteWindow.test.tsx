@@ -96,6 +96,7 @@ function note(activeTab = "p1"): Note {
     fontSize: 14,
     toolbar: false,
     frozenRows: 0,
+      layout: "default",
     pinned: false,
     translucent: false,
     collapsed: false,
