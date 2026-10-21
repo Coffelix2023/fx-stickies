@@ -27,6 +27,13 @@ import {
   type Layout,
 } from "./document";
 
+/**
+ * 开发模式下跑的是 target/debug 二进制：它不含内嵌前端资源，靠 devUrl
+ * `http://localhost:1420` 加载界面。开机自启时那个 dev server 并不存在，
+ * 每一张便签都会变成空白透明窗口（托盘正常、菜单能点、内容却看不见），
+ * 所以这一档只在打包产物里开放。
+ */
+const AUTOSTART_AVAILABLE = !import.meta.env.DEV;
 /** 菜单点完要做什么。原生菜单只管把动作报回来，动手的是便签窗口。 */
 export type NoteMenuAction =
   | { kind: "appearance"; patch: { pattern: Pattern } }
@@ -161,8 +168,9 @@ export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, layout,
             }),
             await PredefinedMenuItem.new({ item: "Separator" }),
             await CheckMenuItem.new({
-              text: "开机启动",
+              text: AUTOSTART_AVAILABLE ? "开机启动" : "开机启动（打包版可用）",
               checked: autoStart,
+              enabled: AUTOSTART_AVAILABLE,
               action: () => {
                 if (autoStart) void disableAutostart();
                 else void enableAutostart();

@@ -69,6 +69,12 @@ pub const MENU_LIST: &str = "note-list";
 pub const MENU_SHOW_ALL: &str = "show-all";
 pub const MENU_HIDE_ALL: &str = "hide-all";
 pub const MENU_QUIT: &str = "quit";
+/// 主菜单里的「版本信息」子菜单。
+pub const MENU_VERSION: &str = "version";
+/// 子菜单项：版本 + 短哈希。哈希由 build.rs 注入，与 bundle 版本同一套来源。
+pub const MENU_VERSION_STAMP: &str = "version-stamp";
+/// 子菜单项：构建日期。
+pub const MENU_BUILD_DATE: &str = "build-date";
 pub const NOTE_PREFIX: &str = "note:";
 
 
@@ -129,6 +135,28 @@ pub fn build_menu<R: Runtime>(
     menu.append(&list)?;
 
 
+    // 版本信息收进子菜单：主菜单保持短，想确认是哪一次构建时再展开。
+    menu.append(&PredefinedMenuItem::separator(app)?)?;
+    let version = Submenu::with_id(app, MENU_VERSION, "版本信息", true)?;
+    version.append(&MenuItem::with_id(
+        app,
+        MENU_VERSION_STAMP,
+        format!(
+            "版本 {}+{}",
+            env!("CARGO_PKG_VERSION"),
+            env!("BUILD_STAMP")
+        ),
+        false,
+        None::<&str>,
+    )?)?;
+    version.append(&MenuItem::with_id(
+        app,
+        MENU_BUILD_DATE,
+        format!("发布 {}", env!("BUILD_DATE")),
+        false,
+        None::<&str>,
+    )?)?;
+    menu.append(&version)?;
     menu.append(&PredefinedMenuItem::separator(app)?)?;
     menu.append(&MenuItem::with_id(
         app,
