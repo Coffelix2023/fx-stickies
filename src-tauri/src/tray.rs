@@ -136,6 +136,8 @@ pub fn build_menu<R: Runtime>(
 
 
     // 版本信息收进子菜单：主菜单保持短，想确认是哪一次构建时再展开。
+    // 两项都保持 enabled：macOS 的禁用态是灰字，版本这种要读的内容看不清。
+    // 点击只会落到 MenuAction::Ignore，除了关掉菜单不改任何状态。
     menu.append(&PredefinedMenuItem::separator(app)?)?;
     let version = Submenu::with_id(app, MENU_VERSION, "版本信息", true)?;
     version.append(&MenuItem::with_id(
@@ -146,14 +148,14 @@ pub fn build_menu<R: Runtime>(
             env!("CARGO_PKG_VERSION"),
             env!("BUILD_STAMP")
         ),
-        false,
+        true,
         None::<&str>,
     )?)?;
     version.append(&MenuItem::with_id(
         app,
         MENU_BUILD_DATE,
         format!("发布 {}", env!("BUILD_DATE")),
-        false,
+        true,
         None::<&str>,
     )?)?;
     menu.append(&version)?;
