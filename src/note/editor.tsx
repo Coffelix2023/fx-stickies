@@ -33,12 +33,14 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 import type { NoteContent, StatusSize } from "./document";
 import { NoteImage } from "./image";
 import { ScrollArrows, useScrollEdges } from "./ScrollStrip";
 import { FencedParagraph } from "./fenced-paragraph";
 import { PlainTextPaste } from "./plain-text-paste";
+import { SystemClipboardPaste } from "./clipboard-paste";
 import { applyFrozenTops, frozenTops } from "./frozen-rows";
 /**
  * 块级命令执行前先确保编辑器有焦点。
@@ -191,6 +193,8 @@ const extensions = [
   Markdown.configure({ markedOptions: { gfm: true } }),
   NoteImage,
   PlainTextPaste,
+  // ⌘V 先由自己接管：图片走 Rust 侧剪贴板，文本再交回上面的 Markdown 通路。
+  SystemClipboardPaste,
   FencedParagraph,
   // 对齐落在段落和标题上：列表和引用本身有自己的排版，不给它们加对齐。
   TextAlign.configure({ types: ["paragraph", "heading"] }),
@@ -492,6 +496,13 @@ export function NoteBody({ editor, frozenRows }: { editor: Editor | null; frozen
       editor={editor}
       // 没有底部圆角：下面还压着一行字符数，圆角交给便签根节点统一收口。
       className="note-body min-h-0 flex-1 overflow-auto px-3.5 mt-2.5 pb-4 outline-none"
+      // 光标在图像上是 zoom-in（App.css），点一下开独立原生窗口看存下来的原图。
+      onClick={(event) => {
+        const img = (event.target as HTMLElement).closest("img");
+        if (img instanceof HTMLImageElement) {
+          void invoke("open_image_preview", { src: img.src }).catch(() => {});
+        }
+      }}
     />
   );
 }

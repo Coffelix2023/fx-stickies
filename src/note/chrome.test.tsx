@@ -54,13 +54,22 @@ vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     label: "n1",
     startDragging: () => invoke("plugin:window|start_dragging", { label: "n1" }),
-    // 中键拖动不问 AppKit，自己读起点位置再设位置，所以这三个替身也要有。
+    // 中键拖动不问 AppKit，自己读起点位置、尺寸再设位置，所以这几个替身都要有。
     outerPosition: () =>
       Promise.resolve({ x: 100, y: 200, toLogical: (scale: number) => ({ x: 100 / scale, y: 200 / scale }) }),
+    // 拖动时按窗口自身的尺寸算边界，缺了它 mousedown 就直接抛错。
+    outerSize: () =>
+      Promise.resolve({
+        width: 300,
+        height: 200,
+        toLogical: (scale: number) => ({ width: 300 / scale, height: 200 / scale }),
+      }),
     scaleFactor: () => Promise.resolve(1),
     setPosition: (at: { x: number; y: number }) =>
       invoke("plugin:window|set_position", { label: "n1", x: at.x, y: at.y }),
   }),
+  // 拖动时找当前显示器算边界；返回 null 时下落屏兜底，这条分支也一起测到。
+  currentMonitor: () => Promise.resolve(null),
 }));
 
 vi.mock("@tauri-apps/api/dpi", () => ({
@@ -108,6 +117,9 @@ function note(): Note {
     toolbar: false,
     frozenRows: 0,
       layout: "default",
+    imageSize: "full",
+    imageAlign: "left",
+    imageGap: "none",
     pinned: false,
     translucent: false,
     collapsed: false,
@@ -445,6 +457,54 @@ describe("脊条", () => {
     const app = readFileSync("src/App.css", "utf8");
     expect(app).toMatch(/--note-dot: color-mix\([^;]*var\(--note-ink\)\)/);
   });
+  it("回车换行的行距和折行一致：段落不带下边距", () => {
+    const app = readFileSync("src/App.css", "utf8");
+    // 带下边距的话每按一次回车就多出一截空白，看着像行距被撑开
+    expect(app).toMatch(/\.note-body p \{[^}]*margin: 0;/);
+  });
+
+  it("图片四档都是宽度上限，缩略图带圆角", () => {
+    const app = readFileSync("src/App.css", "utf8");
+    // 圆角跟着图走，四档都一样
+    expect(app).toMatch(/\.note-body img \{[^}]*border-radius: 6px/);
+    // min() 才是「便签比档位窄时跟着缩、比档位宽时保持档位」。全尺寸没有上限，落在基础那条 width: 100%。
+    const tiers = [
+      ...app.matchAll(
+        /\.note\[data-image-size="(\w+)"\] \.note-body img \{\s*width: min\(100%, (\d+)px\)/g,
+      ),
+    ].map((match) => [match[1], Number(match[2])]);
+    expect(tiers).toEqual([
+      ["small", 160],
+      ["medium", 280],
+      ["large", 440],
+    ]);
+  });
+
+  it("图片是块级：内联会带上 line-height 的半行高，上下行距就比正文宽", () => {
+    const app = readFileSync("src/App.css", "utf8");
+    expect(app).toMatch(/\.note-body img \{[^}]*display: block/);
+  });
+
+  it("图片水平位置靠左右外边距推，上下留白靠 margin-block 单独管", () => {
+    const app = readFileSync("src/App.css", "utf8");
+    // 靠左是基础规则：左右外边距分开给，右侧吃掉剩余空间
+    expect(app).toMatch(/\.note-body img \{[^}]*margin-inline: 0 auto/);
+    expect(app).toMatch(
+      /\.note\[data-image-align="center"\] \.note-body img \{\s*margin-inline: auto;/,
+    );
+    expect(app).toMatch(
+      /\.note\[data-image-align="right"\] \.note-body img \{\s*margin-inline: auto 0;/,
+    );
+    // 留白用 em，跟着正文字号缩放；「无」就是 0，和正文段落之间一样齐
+    expect(app).toMatch(/\.note-body img \{[^}]*margin-block: 0;/);
+    expect(app).toMatch(
+      /\.note\[data-image-gap="narrow"\] \.note-body img \{\s*margin-block: 0\.4em;/,
+    );
+    expect(app).toMatch(
+      /\.note\[data-image-gap="wide"\] \.note-body img \{\s*margin-block: 1\.4em;/,
+    );
+  });
+
   it("深色纸上正文切成浅色，选区再反回来", () => {
     const app = readFileSync("src/App.css", "utf8");
     const chrome = readFileSync("src/note/chrome.css", "utf8");
@@ -619,6 +679,11 @@ describe("原生菜单", () => {
       "半透明",
       
     ]);
+    // 图片是独立的一级子菜单，位置就在「外观」下面
+    const top = lastMenu
+      .map((entry) => entry.text)
+      .filter((text) => typeof text === "string");
+    expect(top.indexOf("图片")).toBe(top.indexOf("外观") + 1);
     // 标签是禁用项，点了没反应，也不该再有下级。
     expect(menuItem("标题栏").enabled).toBe(false);
     expect(menuItem("标题栏").items).toBeUndefined();
@@ -652,7 +717,7 @@ describe("原生菜单", () => {
     expect(label?.enabled).toBe(false);
     expect(label?.items).toBeUndefined();
 
-    // 「字符统计」之后是那四档，再加一个独立的「半透明」勾选项。
+    // 「字符统计」之后是那四档，再加一个独立的「半透明」勾选项，就到「外观」的末尾了。
     const after = entries.slice(entries.indexOf(label as MenuItemLike) + 1);
     expect(after.map((entry) => entry.text)).toEqual(["不显示", "小", "默认", "大", "半透明"]);
     expect(after.find((entry) => entry.text === "大")?.checked).toBe(true);
@@ -661,6 +726,53 @@ describe("原生菜单", () => {
     const faded = after.find((entry) => entry.text === "半透明");
     expect(faded?.checked).toBe(true);
     expect(faded?.items).toBeUndefined();
+  });
+
+  it("图片是子菜单：尺寸、水平位置、上下空间三组，当前档位打勾", async () => {
+    renderWindow({
+      ...note(),
+      imageSize: "medium",
+      imageAlign: "center",
+      imageGap: "wide",
+    });
+    await loaded();
+
+    fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+    await waitFor(() => expect(lastMenu.length).toBeGreaterThan(0));
+
+    const image = menuItem("图片");
+    // 三组设置收在子菜单里，而不是铺平在「外观」中
+    expect(image.items).toBeTruthy();
+
+    const entries = (image.items ?? []).filter(
+      (entry) => typeof entry.text === "string",
+    );
+    expect(entries.map((entry) => entry.text)).toEqual([
+      "尺寸",
+      "小",
+      "中",
+      "大",
+      "全尺寸",
+      "水平位置",
+      "左对齐",
+      "居中",
+      "右对齐",
+      "上下空间",
+      "无",
+      "窄",
+      "宽",
+    ]);
+
+    const checked = (text: string) =>
+      entries.find((entry) => entry.text === text)?.checked;
+    expect(checked("中")).toBe(true);
+    expect(checked("居中")).toBe(true);
+    expect(checked("宽")).toBe(true);
+    expect(checked("小")).toBe(false);
+    // 三条分组标题是禁用项，点了没反应
+    for (const title of ["尺寸", "水平位置", "上下空间"]) {
+      expect(entries.find((entry) => entry.text === title)?.enabled).toBe(false);
+    }
   });
 });
 
@@ -710,6 +822,50 @@ describe("菜单动作", () => {
     await waitFor(() => {
       const saves = invoke.mock.calls.filter(([command]) => command === "save_note");
       expect(saves[saves.length - 1]?.[1].note.statusSize).toBe("large");
+    });
+  });
+
+  it("换图片尺寸：根节点换 data-image-size，档位跟着落盘", async () => {
+    const { container } = renderWindow(note());
+    await loaded();
+
+    fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+    await waitFor(() => expect(lastMenu.length).toBeGreaterThan(0));
+    // 「小」在标题栏和字符统计组各有一个，图片这一档在「图片」子菜单里。
+    const imageItems = (menuItem("图片").items ?? []).filter(
+      (entry) => typeof entry.text === "string",
+    );
+    imageItems.find((entry) => entry.text === "小")?.action?.();
+
+    await waitFor(() =>
+      expect((container.querySelector(".note") as HTMLElement).dataset.imageSize).toBe("small"),
+    );
+    await waitFor(() => {
+      const saves = invoke.mock.calls.filter(([command]) => command === "save_note");
+      expect(saves[saves.length - 1]?.[1].note.imageSize).toBe("small");
+    });
+  });
+
+  it("换图片水平位置与上下空间：两个 data 属性跟着走，档位都落盘", async () => {
+    const { container } = renderWindow(note());
+    await loaded();
+
+    fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+    await waitFor(() => expect(lastMenu.length).toBeGreaterThan(0));
+
+    const items = () =>
+      (menuItem("图片").items ?? []).filter((entry) => typeof entry.text === "string");
+    items().find((entry) => entry.text === "居中")?.action?.();
+    items().find((entry) => entry.text === "窄")?.action?.();
+
+    const root = () => container.querySelector(".note") as HTMLElement;
+    await waitFor(() => expect(root().dataset.imageAlign).toBe("center"));
+    await waitFor(() => expect(root().dataset.imageGap).toBe("narrow"));
+    await waitFor(() => {
+      const saves = invoke.mock.calls.filter(([command]) => command === "save_note");
+      const saved = saves[saves.length - 1]?.[1].note;
+      expect(saved.imageAlign).toBe("center");
+      expect(saved.imageGap).toBe("narrow");
     });
   });
 

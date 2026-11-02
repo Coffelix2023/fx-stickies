@@ -1,3 +1,4 @@
+pub mod clipboard;
 pub mod frame;
 pub mod note;
 pub mod tray;
@@ -142,6 +143,61 @@ fn note_url(id: &str) -> WebviewUrl {
     WebviewUrl::App(format!("index.html?note={id}").into())
 }
 
+/// 原图预览窗的图源暂存：data URL 走 query 太长，进窗后再 invoke 来取。
+#[derive(Default)]
+struct ImagePreviews(Mutex<HashMap<String, String>>);
+
+/// 预览窗口的入口。窗口只渲染查询参数指到的那份图源。
+fn preview_url(id: &str) -> WebviewUrl {
+    WebviewUrl::App(format!("index.html?image-preview={id}").into())
+}
+
+/// 打开独立的原图预览窗口：盖在桌面上，不受便签窗口尺寸约束。
+#[tauri::command]
+fn open_image_preview<R: Runtime>(app: AppHandle<R>, src: String) -> Result<String, String> {
+    let id = format!("preview-{}", uuid::Uuid::new_v4().simple());
+    if let Some(state) = app.try_state::<ImagePreviews>()
+        && let Ok(mut previews) = state.0.lock() {
+            previews.insert(id.clone(), src);
+        }
+    if let Some(window) = app.get_webview_window(&id) {
+        window.set_focus().map_err(|err| err.to_string())?;
+        return Ok(id);
+    }
+    WebviewWindowBuilder::new(&app, &id, preview_url(&id))
+        .title("图像预览")
+        .inner_size(880.0, 660.0)
+        .decorations(true)
+        .transparent(false)
+        .shadow(true)
+        .always_on_top(true)
+        .focused(true)
+        .build()
+        .map_err(|err| err.to_string())?;
+    Ok(id)
+}
+
+/// 预览窗口进场后用 id 把图源取走。
+#[tauri::command]
+fn get_image_preview<R: Runtime>(app: AppHandle<R>, id: String) -> Result<String, String> {
+    app.try_state::<ImagePreviews>()
+        .and_then(|state| state.0.lock().ok()?.get(&id).cloned())
+        .ok_or_else(|| "预览已关闭".to_string())
+}
+
+/// 关掉独立的原图预览窗口，顺手清掉暂存的图源。
+#[tauri::command]
+fn close_image_preview<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(), String> {
+    if let Some(state) = app.try_state::<ImagePreviews>()
+        && let Ok(mut previews) = state.0.lock() {
+            previews.remove(&id);
+        }
+    if let Some(window) = app.get_webview_window(&id) {
+        window.close().map_err(|err| err.to_string())?;
+    }
+    Ok(())
+}
+
 fn show_at<R: Runtime>(
     app: &AppHandle<R>,
     note: &Note,
@@ -232,6 +288,15 @@ fn new_note<R: Runtime>(app: AppHandle<R>) -> Result<String, String> {
     create(&app)
 }
 
+/// 前端按下 ⌘/Ctrl+V 时来问一句：剪贴板里是图片还是文本。
+///
+/// 便签不靠 webview 的 paste 事件取图：Finder 复制的图片在剪贴板上只有一条文件
+/// URL，webview 拿不到像素。这里由 Rust 侧统一读，前端只管按 mime 分派。
+#[tauri::command]
+fn read_clipboard() -> Result<clipboard::ClipboardContent, String> {
+    clipboard::read()
+}
+
 /// 写入置顶状态并应用到窗口。文档是唯一事实来源，所以重启后仍然保持。
 fn save_pinned<R: Runtime>(
     app: &AppHandle<R>,
@@ -285,6 +350,9 @@ fn merge_frontend_fields(stored: &Note, incoming: &Note) -> Note {
         status_faded: incoming.status_faded,
         frozen_rows: incoming.frozen_rows,
         layout: incoming.layout,
+        image_size: incoming.image_size,
+        image_align: incoming.image_align,
+        image_gap: incoming.image_gap,
         ..stored.clone()
     }
 }
@@ -593,7 +661,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .manage(FrameWrites::default())
+        .manage(ImagePreviews::default())
         .invoke_handler(tauri::generate_handler![
+            read_clipboard,
             new_note,
             export_write_text,
             export_write_bytes,
@@ -603,7 +673,10 @@ pub fn run() {
             set_visible,
             delete_note,
             align_note,
-            toggle_maximize
+            toggle_maximize,
+            open_image_preview,
+            get_image_preview,
+            close_image_preview
         ])
         .on_menu_event(|app, event| match notes_dir(app) {
             Ok(dir) => handle_menu_event(app, &dir, event.id().as_ref()),

@@ -10,7 +10,7 @@ The macOS Stacks app cannot do WYSIWYG editing, pastes carry source styling, and
 ## 功能 Features
 
 - **一便签一窗口** — 默认 420×320，手动缩放下限 200×120，位置与尺寸重启后恢复
-- **所见即所得** — Tiptap 编辑器，正文以 JSON 保存；外部粘贴只保留纯文本
+- **所见即所得** — Tiptap 编辑器，正文以 JSON 保存；外部文本粘贴只保留纯文本，剪贴板图片直接粘贴为图片节点并自动压缩
 - **Tab 缩进** — Tab 只做缩进，不在便签的按钮之间跳：焦点不在正文时第一下 Tab 把光标带回正文；列表里缩进一层、Shift+Tab 退一层，普通段落插制表符，工具栏也有缩进/减少缩进两枚按钮
 - **字符数** — 右下角常驻显示总字符数，选中文字时变成「选中数 / 总数」
 - **菜单栏入口** — 新建、便签列表、全部显示、全部隐藏、退出（Dock 无图标）
@@ -19,6 +19,7 @@ The macOS Stacks app cannot do WYSIWYG editing, pastes carry source styling, and
 - **界面缩放** — 「更多操作 > 外观 > 界面」里放大/缩小/重置字号（⌘ + / ⌘ − / ⌘0，默认 14px，范围 8–100px）
 - **正文布局** — 「更多操作 > 外观」里切正文行距档位（紧凑 / 默认 / 宽松），随便签存盘
 - **Markdown 工具栏** — 标题、加粗、斜体、删除线、行内代码、列表、引用、代码块、分割线、对齐、撤销重做，高度与标题栏一致（默认 20px）；脊条上的 `T` 图标直接开关。便签装不下时横向滚动，两端出成对的箭头（和底色抽屉同一套）
+- **图片** — 悬停图片显示放大镜光标，点击弹出独立预览窗口看原图（点图/点背景/Esc 关闭，不受便签窗口尺寸约束）；「更多操作 → 图片」里调尺寸、对齐与上下留白，随便签存盘
 - **窗口控制** — 拖脊条移动、置顶、双击脊条铺满屏幕/恢复原尺寸、对齐到屏幕
 - **冻结首行** — 「更多操作」菜单里勾选「冻结首行」，编辑时第一行固定在顶部，带投影与左右满格背景，滚动时其余内容从其下经过
 - **原生菜单** — 「更多操作」是 macOS 原生 NSMenu：底纹、对齐、外观各收在子菜单里（底纹和标题栏档位带对勾），字号三项带 ⌘+ / ⌘− / ⌘0；点开即出，没有第二个窗口要建
@@ -76,8 +77,8 @@ pnpm tauri build    # 只构建，产出的 DMG 里没有 run-fix.command
 ~/Library/Application Support/app.fx.stickies/notes/<uuid>.json
 ```
 
-隐藏只关窗口，不删文件。删除需要显式操作。旧版本的颜色名通过 serde alias 兼容读取，磁盘文件不需要迁移。
-Hiding a note only closes its window; deleting it is always explicit. Older color names stay readable via serde aliases, so no on-disk migration is needed.
+隐藏只关窗口，不删文件。删除需要显式操作。旧版本的颜色名与底纹名通过 serde alias 兼容读取，磁盘文件不需要迁移。
+Hiding a note only closes its window; deleting it is always explicit. Older color and pattern names stay readable via serde aliases, so no on-disk migration is needed.
 
 ## 项目结构 Layout
 

@@ -24,6 +24,15 @@ import {
   type StatusSize,
   LAYOUTS,
   LAYOUT_LABELS,
+  IMAGE_SIZES,
+  IMAGE_SIZE_LABELS,
+  IMAGE_ALIGN_LABELS,
+  IMAGE_ALIGNS,
+  IMAGE_GAP_LABELS,
+  IMAGE_GAPS,
+  type ImageAlign,
+  type ImageGap,
+  type ImageSize,
   type Layout,
 } from "./document";
 
@@ -41,6 +50,9 @@ export type NoteMenuAction =
   | { kind: "statusSize"; size: StatusSize }
   | { kind: "statusFaded"; faded: boolean }
   | { kind: "layout"; layout: Layout }
+  | { kind: "imageSize"; size: ImageSize }
+  | { kind: "imageAlign"; align: ImageAlign }
+  | { kind: "imageGap"; gap: ImageGap }
   | { kind: "frozenRows"; rows: number }
   | { kind: "export"; format: "markdown" | "text" | "docx" }
   | { kind: "fontScale"; step: number }
@@ -61,6 +73,12 @@ type Props = {
   layout: Layout;
   /** 当前冻结的正文行数。 */
   frozenRows: number;
+  /** 当前图片尺寸档位，菜单打勾的位置从这里来。 */
+  imageSize: ImageSize;
+  /** 当前图片水平位置，菜单打勾的位置从这里来。 */
+  imageAlign: ImageAlign;
+  /** 当前图片上下留白档位，菜单打勾的位置从这里来。 */
+  imageGap: ImageGap;
   onAction: (action: NoteMenuAction) => void;
 };
 
@@ -70,7 +88,18 @@ type Props = {
  *
  * 原生菜单只能放文字，所以底纹、对齐和外观各自收进子菜单，选中态用对勾表示。
  */
-export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, layout, frozenRows, onAction }: Props) {
+export function NoteMenu({
+  pattern,
+  chromeSize,
+  statusSize,
+  statusFaded,
+  layout,
+  imageSize,
+  imageAlign,
+  imageGap,
+  frozenRows,
+  onAction,
+}: Props) {
   async function popup(at: LogicalPosition) {
     const autoStart = await autostartEnabled().catch(() => false);
     const menu = await Menu.new({
@@ -159,6 +188,42 @@ export function NoteMenu({ pattern, chromeSize, statusSize, statusFaded, layout,
               checked: statusFaded,
               action: () => onAction({ kind: "statusFaded", faded: !statusFaded }),
             }),
+          ],
+        }),
+        // 图片三组设置各占一格，所以自己是一级子菜单：塞进「外观」里那个菜单会长到要滚动。
+        await Submenu.new({
+          text: "图片",
+          items: [
+            await MenuItem.new({ text: "尺寸", enabled: false }),
+            ...(await Promise.all(
+              IMAGE_SIZES.map((size) =>
+                CheckMenuItem.new({
+                  text: IMAGE_SIZE_LABELS[size],
+                  checked: size === imageSize,
+                  action: () => onAction({ kind: "imageSize", size }),
+                }),
+              ),
+            )),
+            await MenuItem.new({ text: "水平位置", enabled: false }),
+            ...(await Promise.all(
+              IMAGE_ALIGNS.map((align) =>
+                CheckMenuItem.new({
+                  text: IMAGE_ALIGN_LABELS[align],
+                  checked: align === imageAlign,
+                  action: () => onAction({ kind: "imageAlign", align }),
+                }),
+              ),
+            )),
+            await MenuItem.new({ text: "上下空间", enabled: false }),
+            ...(await Promise.all(
+              IMAGE_GAPS.map((gap) =>
+                CheckMenuItem.new({
+                  text: IMAGE_GAP_LABELS[gap],
+                  checked: gap === imageGap,
+                  action: () => onAction({ kind: "imageGap", gap }),
+                }),
+              ),
+            )),
           ],
         }),
             await CheckMenuItem.new({

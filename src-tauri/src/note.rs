@@ -55,6 +55,8 @@ pub enum Paper {
 pub enum Pattern {
     Plain,
     Dots,
+    /// 磁盘上有 pattern=hatch 的文档（认不出来就会拒绝打开）：落到同属线条纹理的方格。
+    #[serde(alias = "hatch")]
     Grid,
 }
 
@@ -103,6 +105,42 @@ pub enum Layout {
     Relaxed,
 }
 
+/// 便签里图片的显示尺寸档位。具体像素在 `src/App.css`，这里只存档位。
+/// 每一档都是宽度上限：正文栏比它窄时按栏宽缩，比它宽时保持档位尺寸。
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImageSize {
+    Small,
+    Medium,
+    /// 默认档：便签窗口普遍不宽，全尺寸会把图撑满整栏。旧文档没有这个字段，落回这一档。
+    #[default]
+    Large,
+    /// 铺满正文栏。
+    Full,
+}
+
+/// 图片在正文里的水平位置。便签比图片宽时才有可见效果，具体写法在 `src/App.css`。
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImageAlign {
+    /// 靠左是默认：正文本来就从左边起排。
+    #[default]
+    Left,
+    Center,
+    Right,
+}
+
+/// 图片上下的留白档位：无 / 窄 / 宽。具体高度在 `src/App.css`，跟着正文字号缩放。
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImageGap {
+    None,
+    /// 默认档：贴太紧看不出图像和正文的分界，太松又像多空了一行。
+    #[default]
+    Narrow,
+    Wide,
+}
+
 /// 一张便签的完整文档。字段与设计文档一致。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -142,6 +180,15 @@ pub struct Note {
     /// 正文行高/行距档位。旧文档没有这个字段，按默认档读进来。
     #[serde(default)]
     pub layout: Layout,
+    /// 便签里图片的显示尺寸档位。旧文档没有这个字段，按全尺寸读进来。
+    #[serde(default)]
+    pub image_size: ImageSize,
+    /// 图片的水平位置。旧文档没有这个字段，按靠左读进来。
+    #[serde(default)]
+    pub image_align: ImageAlign,
+    /// 图片上下的留白档位。旧文档没有这个字段，按无读进来。
+    #[serde(default)]
+    pub image_gap: ImageGap,
     pub frame: Rect,
     /// 折叠前保存的展开尺寸；未折叠时为 None。
     pub expanded_size: Option<Size>,
@@ -212,6 +259,9 @@ impl Note {
             status_size: StatusSize::Normal,
             status_faded: true,
             layout: Layout::Default,
+            image_size: ImageSize::Large,
+            image_align: ImageAlign::Left,
+            image_gap: ImageGap::Narrow,
             frame,
             expanded_size: None,
             maximized: false,
@@ -393,6 +443,9 @@ mod tests {
         assert_eq!(note.chrome_size, ChromeSize::Normal);
         assert_eq!(note.status_size, StatusSize::Normal);
         assert!(note.status_faded);
+        assert_eq!(note.image_size, ImageSize::Large);
+        assert_eq!(note.image_align, ImageAlign::Left);
+        assert_eq!(note.image_gap, ImageGap::Narrow);
         assert!(note.visible);
     }
 
@@ -431,6 +484,50 @@ mod tests {
     }
 
     #[test]
+    fn image_align_and_gap_use_the_same_words_as_the_frontend() {
+        // 前端 document.ts 的 IMAGE_ALIGNS / IMAGE_GAPS 就是这几个词，认错一个就存不进盘。
+        for (value, text) in [
+            (ImageAlign::Left, "left"),
+            (ImageAlign::Center, "center"),
+            (ImageAlign::Right, "right"),
+        ] {
+            assert_eq!(serde_json::to_value(value).unwrap(), serde_json::json!(text));
+            assert_eq!(
+                serde_json::from_value::<ImageAlign>(serde_json::json!(text)).unwrap(),
+                value
+            );
+        }
+        for (value, text) in [
+            (ImageGap::None, "none"),
+            (ImageGap::Narrow, "narrow"),
+            (ImageGap::Wide, "wide"),
+        ] {
+            assert_eq!(serde_json::to_value(value).unwrap(), serde_json::json!(text));
+            assert_eq!(
+                serde_json::from_value::<ImageGap>(serde_json::json!(text)).unwrap(),
+                value
+            );
+        }
+    }
+
+    #[test]
+    fn image_size_uses_the_same_words_as_the_frontend() {
+        // 四档的名字必须和前端 document.ts 的 IMAGE_SIZES 完全对上，认错一个就存不进盘。
+        for (value, text) in [
+            (ImageSize::Small, "small"),
+            (ImageSize::Medium, "medium"),
+            (ImageSize::Large, "large"),
+            (ImageSize::Full, "full"),
+        ] {
+            assert_eq!(serde_json::to_value(value).unwrap(), serde_json::json!(text));
+            assert_eq!(
+                serde_json::from_value::<ImageSize>(serde_json::json!(text)).unwrap(),
+                value
+            );
+        }
+    }
+
+    #[test]
     fn document_without_later_fields_falls_back_to_defaults() {
         // 字号和工具栏是后加的字段，磁盘上早于它们的文档必须照常打开。
         let dir = test_dir();
@@ -449,6 +546,9 @@ mod tests {
         object.remove("chromeSize");
         object.remove("statusSize");
         object.remove("statusFaded");
+        object.remove("imageSize");
+        object.remove("imageAlign");
+        object.remove("imageGap");
         write_raw(&dir, "n1", &value);
 
         let loaded = load(&dir, "n1").unwrap();
@@ -457,6 +557,9 @@ mod tests {
         assert_eq!(loaded.chrome_size, ChromeSize::Normal);
         assert_eq!(loaded.status_size, StatusSize::Normal);
         assert!(loaded.status_faded);
+        assert_eq!(loaded.image_size, ImageSize::Large);
+        assert_eq!(loaded.image_align, ImageAlign::Left);
+        assert_eq!(loaded.image_gap, ImageGap::Narrow);
         assert!(!loaded.maximized);
         assert_eq!(loaded.restore_frame, None);
     }
@@ -749,6 +852,22 @@ mod tests {
             assert_eq!(parsed, expected, "{old} 应当落到最接近的新色");
         }
         assert!(serde_json::from_value::<Paper>(serde_json::json!("unknown")).is_err());
+    }
+
+    #[test]
+    fn old_pattern_names_still_open() {
+        // 磁盘上有 pattern=hatch 的文档：认不出来就会拒绝打开，用户会以为便签丢了。
+        let parsed: Pattern = serde_json::from_value(serde_json::json!("hatch")).unwrap();
+        assert_eq!(parsed, Pattern::Grid);
+        assert!(serde_json::from_value::<Pattern>(serde_json::json!("unknown")).is_err());
+
+        // 整文档级：含 hatch 的旧文件能打开并落到方格。
+        let dir = test_dir();
+        let note = Note::new("n1".into(), Rect::new(0.0, 0.0, DEFAULT_WIDTH, DEFAULT_HEIGHT));
+        let mut value = serde_json::to_value(&note).unwrap();
+        value["pattern"] = serde_json::json!("hatch");
+        write_raw(&dir, "n1", &value);
+        assert_eq!(load(&dir, "n1").unwrap().pattern, Pattern::Grid);
     }
 
     #[test]

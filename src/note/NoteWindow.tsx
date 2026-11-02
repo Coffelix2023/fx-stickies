@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { NoteEditor } from "./NoteEditor";
 import { PaperDrawer } from "./PaperDrawer";
+import { shrinkOversizedImages } from "./image-shrink";
 import { NoteSpine, startDragOnMiddleButton } from "./NoteSpine";
 import { type NoteMenuAction } from "./NoteMenu";
 import {
@@ -118,10 +119,19 @@ export function NoteWindow({ id }: { id: string }) {
   useEffect(() => {
     let cancelled = false;
     getNote(id)
-      .then((loaded) => {
+      .then(async (loaded) => {
         if (cancelled) return;
         lastSaved.current = loaded;
         setNote(loaded);
+        // 存量文档里可能已经嵌着几 MB 的图：后台收口一次，磁盘上的旧图由下面的防抖写回。
+        const shrunk = await shrinkOversizedImages(loaded.content);
+        if (cancelled || !shrunk) return;
+        setNote((current) =>
+          // 收口期间用户已经动了正文就放弃这一次：他的内容优先，下次打开再试。
+          current && current.content === loaded.content
+            ? { ...current, content: shrunk }
+            : current,
+        );
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(String(err));
@@ -151,6 +161,13 @@ export function NoteWindow({ id }: { id: string }) {
       setNote((prev) => (prev ? { ...prev, statusSize: action.size } : prev));
     } else if (action.kind === "statusFaded") {
       setNote((prev) => (prev ? { ...prev, statusFaded: action.faded } : prev));
+    } else if (action.kind === "imageSize") {
+      // 像素上限在 App.css，这里只落档位。
+      setNote((prev) => (prev ? { ...prev, imageSize: action.size } : prev));
+    } else if (action.kind === "imageAlign") {
+      setNote((prev) => (prev ? { ...prev, imageAlign: action.align } : prev));
+    } else if (action.kind === "imageGap") {
+      setNote((prev) => (prev ? { ...prev, imageGap: action.gap } : prev));
     } else if (action.kind === "layout") {
       if (note) {
         const next = { ...note, layout: action.layout };
@@ -217,6 +234,21 @@ export function NoteWindow({ id }: { id: string }) {
       setNote((prev) =>
         prev ? { ...prev, fontSize: scaleFontSize(prev.fontSize, step) } : prev,
       );
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  /**
+   * ⌘/Ctrl+N 新建一张便签。新建本身在 Rust 侧（托盘菜单走同一条命令），
+   * 这里只负责吃掉按键：不吃掉 webview 会拿它开一个浏览器新窗口。
+   */
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      if (event.key.toLowerCase() !== "n") return;
+      event.preventDefault();
+      invoke("new_note").catch((err: unknown) => setError(String(err)));
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -306,6 +338,11 @@ export function NoteWindow({ id }: { id: string }) {
       data-chrome-size={note.chromeSize}
       data-frozen-rows={note.frozenRows}
       data-layout={note.layout}
+      // 图片尺寸档位：像素上限在 App.css，正文栏比它窄时按栏宽缩。
+      data-image-size={note.imageSize}
+      // 水平位置与上下留白同上：档位进文档，像素与写法在 App.css。
+      data-image-align={note.imageAlign}
+      data-image-gap={note.imageGap}
       // 字号挂在根上，正文和标题一起缩放；标题栏那组控件走上面的 chromeSize。
       style={{ fontSize: `${note.fontSize}px` }}
     >

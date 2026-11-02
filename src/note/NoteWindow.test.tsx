@@ -97,6 +97,9 @@ function note(activeTab = "p1"): Note {
     toolbar: false,
     frozenRows: 0,
       layout: "default",
+    imageSize: "full",
+    imageAlign: "left",
+    imageGap: "none",
     pinned: false,
     translucent: false,
     collapsed: false,
@@ -334,5 +337,53 @@ describe("隐藏便签", () => {
       invoke.mock.calls.some(([command]) => command === "set_visible"),
     ).toBe(false);
     expect(editor().value).toContain("关不掉的字");
+  });
+});
+
+
+describe("新建便签快捷键", () => {
+  const pressNew = (init: KeyboardEventInit) => {
+    const event = new KeyboardEvent("keydown", {
+      key: "n",
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    });
+    window.dispatchEvent(event);
+    return event;
+  };
+
+  it("⌘N 吃掉浏览器默认行为，改走新建命令", async () => {
+    renderWindow(note());
+    await waitFor(() => expect(editor().value).toContain("第一页的正文"));
+
+    const event = pressNew({ metaKey: true });
+
+    // 不吃掉的话 webview 会开一个浏览器新窗口，便签一张也不会多
+    expect(event.defaultPrevented).toBe(true);
+    await waitFor(() =>
+      expect(invoke.mock.calls.some(([command]) => command === "new_note")).toBe(true),
+    );
+  });
+
+  it("Ctrl+N 走同一条命令", async () => {
+    renderWindow(note());
+    await waitFor(() => expect(editor().value).toContain("第一页的正文"));
+
+    const event = pressNew({ ctrlKey: true });
+
+    expect(event.defaultPrevented).toBe(true);
+    await waitFor(() =>
+      expect(invoke.mock.calls.some(([command]) => command === "new_note")).toBe(true),
+    );
+  });
+
+  it("裸按 n 照常输入，不新建", async () => {
+    renderWindow(note());
+    await waitFor(() => expect(editor().value).toContain("第一页的正文"));
+
+    pressNew({});
+
+    expect(invoke.mock.calls.some(([command]) => command === "new_note")).toBe(false);
   });
 });

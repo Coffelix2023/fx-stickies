@@ -25,6 +25,9 @@ serde_json = "1"
 uuid = { version = "1", features = ["v4"] }
 tauri-plugin-dialog = "2.8.3"
 tauri-plugin-autostart = "2"
+# 系统剪贴板取图：Finder 复制的图片是一条文件 URL，截图的才是位图，两条路都要走。
+arboard = "3"
+base64 = "0.22"
 
 # 窗口层测试用 Tauri 的 MockRuntime，不需要真的开窗口。
 [dev-dependencies]

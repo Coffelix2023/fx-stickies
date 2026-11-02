@@ -10,13 +10,21 @@ import "./note/chrome.css";
 const NoteWindow = lazy(() =>
   import("./note/NoteWindow").then((module) => ({ default: module.NoteWindow })),
 );
+const PreviewWindow = lazy(() =>
+  import("./note/PreviewWindow").then((module) => ({ default: module.PreviewWindow })),
+);
 
-// 便签窗口的地址带 ?note=<uuid>。没有就不是应用窗口，不渲染内容。
-const noteId = new URLSearchParams(window.location.search).get("note");
-
+// 便签窗口的地址带 ?note=<uuid>，独立预览窗口带 ?image-preview=<id>。都没有就不渲染。
+const params = new URLSearchParams(window.location.search);
+const noteId = params.get("note");
+const previewId = params.get("image-preview");
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    {noteId ? (
+    {previewId ? (
+      <Suspense fallback={null}>
+        <PreviewWindow id={previewId} />
+      </Suspense>
+    ) : noteId ? (
       <Suspense fallback={null}>
         <NoteWindow id={noteId} />
       </Suspense>

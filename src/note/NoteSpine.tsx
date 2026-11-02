@@ -219,6 +219,9 @@ export function NoteSpine({
         statusSize={note.statusSize}
         statusFaded={note.statusFaded}
         layout={note.layout}
+        imageSize={note.imageSize}
+        imageAlign={note.imageAlign}
+        imageGap={note.imageGap}
         frozenRows={note.frozenRows}
         onAction={onMenuAction}
       />

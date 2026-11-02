@@ -141,6 +141,40 @@ export const LAYOUT_LABELS: Record<Layout, string> = {
   relaxed: "宽松",
 };
 
+/**
+ * 便签里图片的显示尺寸档位。具体像素写在 App.css，这里只存档位。
+ * 每一档都是宽度上限：正文栏比它窄时按栏宽缩，比它宽时保持档位尺寸。
+ */
+export const IMAGE_SIZES = ["small", "medium", "large", "full"] as const;
+export type ImageSize = (typeof IMAGE_SIZES)[number];
+
+export const IMAGE_SIZE_LABELS: Record<ImageSize, string> = {
+  small: "小",
+  medium: "中",
+  large: "大",
+  full: "全尺寸",
+};
+
+/** 图片在正文里的水平位置。便签比图片宽时才有可见效果，具体写法在 App.css。 */
+export const IMAGE_ALIGNS = ["left", "center", "right"] as const;
+export type ImageAlign = (typeof IMAGE_ALIGNS)[number];
+
+export const IMAGE_ALIGN_LABELS: Record<ImageAlign, string> = {
+  left: "左对齐",
+  center: "居中",
+  right: "右对齐",
+};
+
+/** 图片上下的留白档位。具体高度在 App.css，跟着正文字号缩放。 */
+export const IMAGE_GAPS = ["none", "narrow", "wide"] as const;
+export type ImageGap = (typeof IMAGE_GAPS)[number];
+
+export const IMAGE_GAP_LABELS: Record<ImageGap, string> = {
+  none: "无",
+  narrow: "窄",
+  wide: "宽",
+};
+
 /** 默认档是 12px；更早的便签没有这个字段，读进来也落到这一档。 */
 export const DEFAULT_STATUS_SIZE: StatusSize = "normal";
 
@@ -151,6 +185,13 @@ export const DEFAULT_STATUS_SIZE: StatusSize = "normal";
 export const DEFAULT_STATUS_FADED = true;
 export const DEFAULT_CHROME_SIZE: ChromeSize = "normal";
 export const DEFAULT_LAYOUT: Layout = "default";
+/** 图片默认「大」：便签窗口普遍不宽，全尺寸会把图撑满整栏、上下留白也没了层次。
+ *  旧文档没有这个字段，同样落回这一档。 */
+export const DEFAULT_IMAGE_SIZE: ImageSize = "large";
+/** 图片默认靠左：正文本来就从左边起排。旧文档没有这个字段也落这一档。 */
+export const DEFAULT_IMAGE_ALIGN: ImageAlign = "left";
+/** 图片默认「窄」：贴太紧看不出图像和正文的分界，太松又像多空了一行。 */
+export const DEFAULT_IMAGE_GAP: ImageGap = "narrow";
 
 const rectSchema = z.object({
   x: z.number(),
@@ -199,6 +240,12 @@ export const noteSchema = z.object({
   statusFaded: z.boolean().default(DEFAULT_STATUS_FADED),
   /** 正文行高/行距档位。旧文档没有这个字段，落回默认档。 */
   layout: z.enum(LAYOUTS).default(DEFAULT_LAYOUT),
+  /** 图片尺寸档位。旧文档没有这个字段，落回全尺寸。 */
+  imageSize: z.enum(IMAGE_SIZES).default(DEFAULT_IMAGE_SIZE),
+  /** 图片的水平位置。旧文档没有这个字段，按靠左处理。 */
+  imageAlign: z.enum(IMAGE_ALIGNS).default(DEFAULT_IMAGE_ALIGN),
+  /** 图片上下的留白档位。旧文档没有这个字段，按无处理。 */
+  imageGap: z.enum(IMAGE_GAPS).default(DEFAULT_IMAGE_GAP),
   frame: rectSchema,
   expandedSize: sizeSchema.nullable(),
   /** 是否处于放大态。窗口层负责改，前端只渲染状态不渲染它。 */

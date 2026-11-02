@@ -142,10 +142,67 @@ body {
   background: transparent;
 }
 
-/* 正文里的图像按所在栏宽度缩放，比例不变，不按原始像素撑开便签 */
+/* 正文里的图像。`display: block` 是关键：内联图片会跟所在行一起带上 line-height 的
+   半行高，上下留白就和正文行距对不上了（粘贴后「图像前后行距不一致」就是这么来的）。
+   宽度是「档位上限」和「栏宽」里较小的那个：便签窄到装不下档位尺寸时跟着栏宽缩，
+   宽过档位尺寸时保持档位尺寸。比例不变，不按原始像素撑开便签。 */
 .note-body img {
+  display: block;
   width: 100%;
   height: auto;
+  border-radius: 6px;
+  /* 上下留白和左右位置分开写：两种设置各管一边，互不覆盖。 */
+  margin-block: 0;
+  margin-inline: 0 auto;
+  /* 光标点出「能放大」的提示：可编辑区默认是打字光标，图片上必须压过去。 */
+  cursor: zoom-in !important;
+}
+.note-body .ProseMirror img {
+  cursor: zoom-in !important;
+}
+.note[data-image-size="small"] .note-body img {
+  width: min(100%, 160px);
+}
+.note[data-image-size="medium"] .note-body img {
+  width: min(100%, 280px);
+}
+.note[data-image-size="large"] .note-body img {
+  width: min(100%, 440px);
+}
+/* 水平位置：靠左是默认（基础规则的 margin-inline: 0 auto），另外两档各推一边。
+   便签比图片宽时才有可见效果 —— 图片铺满栏宽时左右都没有余量。 */
+.note[data-image-align="center"] .note-body img {
+  margin-inline: auto;
+}
+.note[data-image-align="right"] .note-body img {
+  margin-inline: auto 0;
+}
+/* 上下留白用 em：正文字号一缩放（⌘+/-），间距跟着走，和行距保持同一比例。 */
+.note[data-image-gap="narrow"] .note-body img {
+  margin-block: 0.4em;
+}
+.note[data-image-gap="wide"] .note-body img {
+  margin-block: 1.4em;
+}
+
+/* 图像预览层：点正文图像后盖住浏览器视口的独立预览层，图按视口收进可视区，不受便签内部尺寸约束。
+   用 fixed 而不是 absolute —— 正文自己是滚动容器，absolute 会跟着滚走。 */
+.note-image-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgb(0 0 0 / 0.72);
+  cursor: zoom-out;
+}
+.note-image-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 6px;
+  cursor: zoom-out;
 }
 
 /* 底色板分两组，各十枚，都取自 docs/color/ 下的色卡：
@@ -307,8 +364,10 @@ body {
 .note-body h4,
 .note-body h5,
 .note-body h6 { font-size: 1em; }
+/* 段落不带下边距：回车换出来的新段，行距要和折行后的下一行一样。
+   留 6px 的话每按一次回车就多一截空白，看着像行距被撑开。空行仍由空段落占一行。 */
 .note-body p {
-  margin: 0 0 6px;
+  margin: 0;
 }
 /* 引用 - 之前这条规则根本不存在，引用块只有浏览器默认的缩进，
    在纸上和普通段落长得一模一样，用户点完看不出任何变化。 */

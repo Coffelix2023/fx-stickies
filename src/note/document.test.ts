@@ -27,6 +27,9 @@ function note(): Note {
     toolbar: false,
     frozenRows: 0,
     layout: "default",
+    imageSize: "full",
+    imageAlign: "left",
+    imageGap: "none",
     pinned: false,
     translucent: false,
     collapsed: false,
@@ -65,6 +68,25 @@ describe("标题栏尺寸档位", () => {
     expect(noteSchema.safeParse({ ...legacy, chromeSize: "huge" }).success).toBe(false);
     // 非默认档位必须能原样读回来：重开便签还得是用户选的那一档。
     expect(noteSchema.parse({ ...legacy, chromeSize: "xlarge" }).chromeSize).toBe("xlarge");
+  });
+});
+
+describe("图片尺寸档位", () => {
+  it("旧文档落回「大」与「窄」，非法值拒绝读取", () => {
+    const { imageSize: _size, imageAlign: _align, imageGap: _gap, ...legacy } = note();
+    // 默认档是文档的一部分：老便签打开时图片就是「大」+「窄」
+    expect(noteSchema.parse(legacy).imageSize).toBe("large");
+    expect(noteSchema.parse(legacy).imageAlign).toBe("left");
+    expect(noteSchema.parse(legacy).imageGap).toBe("narrow");
+    expect(noteSchema.safeParse({ ...legacy, imageSize: "huge" }).success).toBe(false);
+    expect(noteSchema.safeParse({ ...legacy, imageGap: "huge" }).success).toBe(false);
+    // 各档都得能原样读回来：重开便签还得是用户选的那一档。
+    for (const size of ["small", "medium", "large", "full"] as const) {
+      expect(noteSchema.parse({ ...legacy, imageSize: size }).imageSize).toBe(size);
+    }
+    for (const gap of ["none", "narrow", "wide"] as const) {
+      expect(noteSchema.parse({ ...legacy, imageGap: gap }).imageGap).toBe(gap);
+    }
   });
 });
 

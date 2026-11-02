@@ -8,6 +8,19 @@ import type { Editor } from "@tiptap/react";
 import type { NoteContent } from "./document";
 import { NoteBody, NoteStatus, NoteToolbar, useNoteEditor } from "./editor";
 
+/**
+ * ⌘V 的内容由 Rust 侧剪贴板决定，这里换成可注入的桩。
+ * 图片编码也要跳过：jsdom 没有 2d 上下文，画布那一步测不了，测的是分派。
+ */
+const invoke = vi.hoisted(() => vi.fn());
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => invoke(...args),
+}));
+vi.mock("./image-paste", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./image-paste")>()),
+  encodeClipboardImage: () => Promise.resolve("data:image/png;base64,AAAA"),
+}));
+
 /** 用真实的 Tiptap 实例挂载一个正文区域。 */
 function Body({
   content,
@@ -180,6 +193,44 @@ describe("粘贴", () => {
     expect(paragraphs.map((p) => p.textContent)).toEqual(["第一行", "第二行"]);
   });
 
+  it("粘在段落中间接着当前段落写，不另起一行", async () => {
+    const editor = await mount({
+      type: "doc",
+      content: [{ type: "paragraph", content: [{ type: "text", text: "前文" }] }],
+    });
+    // 光标停在「前」和「文」之间
+    editor.commands.setTextSelection(2);
+
+    paste(editor.view.dom, "粘A\n粘B\n");
+
+    // 整块插入会把这一段切成三段：粘贴看着另起一行，段落外边距又把行距撑宽
+    const blocks = (editor.getJSON() as JSONContent).content ?? [];
+    expect(blocks).toHaveLength(1);
+    expect(editor.getText()).toBe("前粘A\n粘B文");
+  });
+
+  it("首尾空行不进文档", async () => {
+    const { container } = render(<Body content={empty()} />);
+    const editable = container.querySelector(".ProseMirror") as HTMLElement;
+
+    paste(editable, "\n\n第一行\n\n第二行\n\n");
+
+    await waitFor(() => expect(container.textContent).toContain("第二行"));
+    const paragraphs = [...container.querySelectorAll(".ProseMirror > p")];
+    expect(paragraphs.map((p) => p.textContent)).toEqual(["第一行", "第二行"]);
+  });
+
+  it("只粘了空行时什么都不插", async () => {
+    const { container } = render(<Body content={empty()} />);
+    const editable = container.querySelector(".ProseMirror") as HTMLElement;
+
+    paste(editable, "\n\n");
+
+    const paragraphs = [...container.querySelectorAll(".ProseMirror > p")];
+    expect(paragraphs).toHaveLength(1);
+    expect(paragraphs[0]?.textContent).toBe("");
+  });
+
   it("识别标题、行内代码、代码块和分割线", async () => {
     const { container } = render(<Body content={empty()} />);
     const editable = container.querySelector(".ProseMirror") as HTMLElement;
@@ -242,6 +293,78 @@ describe("图像", () => {
     const css = readFileSync("src/App.css", "utf8");
     expect(css).toMatch(/\.note-body img\s*\{[^}]*width:\s*100%/);
     expect(css).toMatch(/\.note-body img\s*\{[^}]*height:\s*auto/);
+  });
+
+  it("图像上给的是「点一下能放大」的光标", () => {
+    const css = readFileSync("src/App.css", "utf8");
+    expect(css).toMatch(/\.note-body img\s*\{[^}]*cursor:\s*zoom-in/);
+  });
+
+  it("点图像开独立原生预览窗口，不在便签内盖层", async () => {
+    invoke.mockResolvedValue("preview-1");
+    const { container } = render(<Body content={image()} />);
+    const img = container.querySelector("img") as HTMLImageElement;
+
+    fireEvent.click(img);
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("open_image_preview", {
+        src: img.getAttribute("src"),
+      }),
+    );
+    // 原生窗口接管预览，便签内不再盖 dialog 层
+    expect(screen.queryByRole("dialog")).toBeNull();
+    invoke.mockReset();
+  });
+
+  it("预览层与预览图都是缩小光标", () => {
+    const css = readFileSync("src/App.css", "utf8");
+    expect(css).toMatch(/\.note-image-preview\s*\{[^}]*cursor:\s*zoom-out/);
+    expect(css).toMatch(/\.note-image-preview img\s*\{[^}]*cursor:\s*zoom-out/);
+  });
+
+  it("可编辑区里的图像悬停保持放大镜，不被打字光标盖掉", () => {
+    const css = readFileSync("src/App.css", "utf8");
+    expect(css).toMatch(/\.note-body \.ProseMirror img\s*\{[^}]*cursor:\s*zoom-in/);
+  });
+});
+
+describe("独立原图预览窗口", () => {
+  const SRC = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+
+  function mockPreview() {
+    invoke.mockImplementation((cmd: unknown, ..._rest: unknown[]) => {
+      if (cmd === "get_image_preview") return Promise.resolve(SRC);
+      return Promise.resolve(undefined);
+    });
+  }
+
+  it("取出图源后居中显示，点图关闭", async () => {
+    mockPreview();
+    const PreviewModule = await import("./PreviewWindow");
+    render(<PreviewModule.PreviewWindow id="preview-1" />);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.querySelector("img")?.getAttribute("src")).toBe(SRC);
+
+    fireEvent.click(dialog.querySelector("img") as HTMLElement);
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("close_image_preview", { id: "preview-1" }),
+    );
+    invoke.mockReset();
+  });
+
+  it("按 Esc 关闭", async () => {
+    mockPreview();
+    const PreviewModule = await import("./PreviewWindow");
+    render(<PreviewModule.PreviewWindow id="preview-2" />);
+
+    await screen.findByRole("dialog");
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("close_image_preview", { id: "preview-2" }),
+    );
+    invoke.mockReset();
   });
 });
 
@@ -852,5 +975,71 @@ describe("块级命令与样式", () => {
 
     // 标记类命令靠「接下来输入的字」生效，选区被换掉就变了语义
     expect(editor.state.selection.from).toBe(before);
+  });
+});
+
+
+describe("⌘V 接管系统剪贴板", () => {
+  /**
+   * Mod 在 macOS 上是 ⌘、其他平台是 Ctrl，按平台选一个。
+   * 两个都按不会匹配：prosemirror-keymap 会把同时按下的修饰键拼成 Meta-Ctrl-v。
+   */
+  const modKey = (): KeyboardEventInit =>
+    /Mac|iP(hone|[oa]d)/.test(navigator.platform)
+      ? { metaKey: true }
+      : { ctrlKey: true };
+
+  const pressPaste = (editor: Editor) => {
+    fireEvent.keyDown(editor.view.dom, { key: "v", ...modKey() });
+  };
+
+  afterEach(() => invoke.mockReset());
+
+  it("剪贴板是文本时仍按 Markdown 插入", async () => {
+    invoke.mockResolvedValue({ kind: "text", text: "# 大标题" });
+    const editor = await mount(empty());
+    editor.commands.focus("start");
+
+    pressPaste(editor);
+
+    await waitFor(() =>
+      expect((editor.getJSON() as JSONContent).content?.[0]?.type).toBe("heading"),
+    );
+    expect(invoke).toHaveBeenCalledWith("read_clipboard");
+  });
+
+  it("剪贴板是图片时插图片节点，不带像素宽高", async () => {
+    invoke.mockResolvedValue({
+      kind: "image",
+      data: "AAAA",
+      mime: "image/png",
+      width: null,
+      height: null,
+    });
+    const editor = await mount(empty());
+    editor.commands.focus("start");
+
+    pressPaste(editor);
+
+    await waitFor(() => {
+      const image = (editor.getJSON() as JSONContent).content?.find(
+        (node) => node.type === "image",
+      );
+      expect(image?.attrs?.src).toBe("data:image/png;base64,AAAA");
+      // 宽高由正文栏决定：写进节点的像素宽高会把便签撑宽
+      expect(image?.attrs?.width ?? null).toBeNull();
+      expect(image?.attrs?.height ?? null).toBeNull();
+    });
+  });
+
+  it("剪贴板为空时文档一点没变", async () => {
+    invoke.mockResolvedValue({ kind: "empty" });
+    const editor = await mount(empty());
+    const before = editor.getJSON();
+
+    pressPaste(editor);
+
+    await waitFor(() => expect(invoke).toHaveBeenCalled());
+    expect(editor.getJSON()).toEqual(before);
   });
 });
